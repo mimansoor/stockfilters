@@ -2,7 +2,7 @@
 
 use lib qw( ..);
 use JSON;
-use LWP::Simple;
+use LWP::Curl;
 use DBI;
 use DateTime qw(:all);
 
@@ -39,8 +39,7 @@ sub check_for_download_time {
 	return $download;
 }
 
-my $url = "http://www.google.com/finance/info?infotype=infoquoteall&q=NSE:NIFTY, NSE:GRASIM, NSE:TECHM, NSE:TCS, NSE:INFY, NSE:ADANIPORTS, NSE:BANKBARODA, NSE:INDUSINDBK, NSE:TATASTEEL, NSE:NTPC, NSE:KOTAKBANK, NSE:HCLTECH, NSE:COALINDIA, NSE:HDFCBANK, NSE:AXISBANK, NSE:TATAPOWER, NSE:TAKE, NSE:LT, NSE:BAJAJ-AUTO, NSE:ONGC, NSE:BHARTIARTL, NSE:BHEL, NSE:YESBANK, NSE:WIPRO, NSE:ACC, NSE:SUNPHARMA, NSE:KRBL, NSE:HEROMOTOCO, NSE:HINDUNILVR, NSE:AMBUJACEM, NSE:SBIN, NSE:RELIANCE, NSE:IDEA, NSE:HDFC, NSE:TATAMTRDVR, NSE:HINDALCO, NSE:PENIND, NSE:TATAMOTORS, NSE:INFRATEL, NSE:ICICIBANK, NSE:ZEEL, NSE:ASIANPAINT, NSE:RAYMOND, NSE:POWERGRID, NSE:ITC, NSE:CIPLA, NSE:GAIL, NSE:DRREDDY, NSE:LUPIN, NSE:BPCL, NSE:AUROPHARMA, NSE:NIFTYJR, NSE:MCDOWELL-N, NSE:BAJAJFINSV, NSE:ABB, NSE:MOTHERSUMI, NSE:BAJFINANCE, NSE:SRTRANSFIN, NSE:CONCOR, NSE:PIDILITIND, NSE:OFSS, NSE:COLPAL, NSE:TITAN, NSE:MARICO, NSE:TORNTPHARM, NSE:OIL, NSE:GLAXO, NSE:BRITANNIA, NSE:PNB, NSE:EMAMILTD, NSE:DLF, NSE:PEL, NSE:JISLJALEQS, NSE:CASTROLIND, NSE:HAVELLS, NSE:GODREJCP, NSE:PFC, NSE:IBULHSGFIN, NSE:TALWALKARS, NSE:DABUR, NSE:GLENMARK, NSE:JSWSTEEL, NSE:VEDL, NSE:LICHSGFIN, NSE:CADILAHC, NSE:BHARATFORG, NSE:TV18BRDCST, NSE:SIEMENS, NSE:APOLLOHOSP, NSE:HINDPETRO, NSE:DIVISLAB, NSE:INDIGO, NSE:BEL, NSE:NMDC, NSE:UPL, NSE:UBL, NSE:CUMMINSIND, NSE:HINDZINC, NSE:IOC, NSE:BANKNIFTY";
-
+my $url = "https://www.google.com/finance/info?infotype=infoquoteall&q=NSE:UBL,NSE:JSWSTEEL,NSE:HINDALCO,NSE:TV18BRDCST,NSE:NIFTYJR,NSE:CUMMINSIND,NSE:MARICO,NSE:ADANIPORTS,NSE:BAJFINANCE,NSE:IOC,NSE:INDUSINDBK,NSE:GAIL,NSE:TAKE,NSE:NIFTY,NSE:EMAMILTD,NSE:TALWALKARS,NSE:GRASIM,NSE:BHARTIARTL,NSE:DRREDDY,NSE:TATAPOWER,NSE:CONCOR,NSE:ASIANPAINT,NSE:LICHSGFIN,NSE:ITC,NSE:AUROPHARMA,NSE:BANKNIFTY,NSE:CIPLA,NSE:TITAN,NSE:PFC,NSE:ABB,NSE:DLF,NSE:DIVISLAB,NSE:TATAMOTORS,NSE:AMBUJACEM,NSE:HINDZINC,NSE:SRTRANSFIN,NSE:MCDOWELL-N,NSE:POWERGRID,NSE:INFY,NSE:HAVELLS,NSE:HDFC,NSE:NMDC,NSE:HCLTECH,NSE:GODREJCP,NSE:OIL,NSE:AXISBANK,NSE:KOTAKBANK,NSE:BAJAJFINSV,NSE:TCS,NSE:BANKBARODA,NSE:APOLLOHOSP,NSE:LUPIN,NSE:SBIN,NSE:IDEA,NSE:TECHM,NSE:SIEMENS,NSE:INFRATEL,NSE:ACC,NSE:SUNPHARMA,NSE:MOTHERSUMI,NSE:GLAXO,NSE:INDIGO,NSE:PIDILITIND,NSE:BEL,NSE:COALINDIA,NSE:BRITANNIA,NSE:ICICIBANK,NSE:HINDUNILVR,NSE:CASTROLIND,NSE:LT,NSE:HDFCBANK,NSE:UPL,NSE:VEDL,NSE:KRBL,NSE:RELIANCE,NSE:PNB,NSE:JISLJALEQS,NSE:WIPRO,NSE:BAJAJ-AUTO,NSE:ONGC,NSE:HINDPETRO,NSE:GLENMARK,NSE:PEL,NSE:TORNTPHARM,NSE:DABUR,NSE:RAYMOND,NSE:COLPAL,NSE:BHARATFORG,NSE:ZEEL,NSE:NTPC,NSE:OFSS,NSE:IBULHSGFIN,NSE:HEROMOTOCO,NSE:BHEL,NSE:TATAMTRDVR,NSE:TATASTEEL,NSE:YESBANK,NSE:CADILAHC,NSE:PENIND,NSE:BPCL";
 
 system("cp realtime_data.db tmp_abcdefgh.db");
 
@@ -50,70 +49,75 @@ my $dsn = "DBI:$driver:dbname=$database";
 my $userid = "";
 my $password = "";
 
-$id = 1;
+$id = 0+1;
+$repeat_always = 1;
 
-while (1) {
+while ($repeat_always) {
 	my $start_time = time();
 	if (check_for_download_time()) {
 		my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
 				      or die $DBI::errstr;
-		my $json_str = get($url);
-		die "Couldn't get $url" unless defined $json_str;
+		my $ua = LWP::Curl->new;
+		my $json_str = $ua->get($url);
+		if (defined $json_str)
+		{
+			$json_str =~ s/\/\///;
 
-		$json_str =~ s/\/\///;
+			my $data;
 
-		my $data;
+			$data = decode_json( $json_str );
+			foreach my $item (@{$data}) {
+				#print "$item->{'ltt'},$item->{'op'},$item->{'hi'},$item->{'lo'},$item->{'l'},$item->{'vo'}\n";
+				undef $stmt;
+				my $name = $item->{'t'};
+				$name =~ s/,//;
+				my $open = $item->{'op'};
+				$open =~ s/,//;
+				my $high = $item->{'hi'};
+				$high =~ s/,//;
+				my $low  = $item->{'lo'};
+				$low =~ s/,//;
+				my $last = $item->{'l_fix'};
+				$last =~ s/,//;
+				my $prev_close = $item->{'pcls_fix'};
+				$prev_close =~ s/,//;
+				my $change = $item->{'c_fix'};
+				$change =~ s/,//;
+				my $change_per = $item->{'cp_fix'};
+				$change_per =~ s/,//;
+				my $volume = $item->{'vo'};
+				$volume =~ s/-/0/;
+				$volume =~ s/m/M/;
+				$volume =~ s/k/K/;
+				$volume =~ s/,//;
+				$volume =~ /.*(M)/;
+				if ($1 eq "M") {
+					$volume =~ s/M//g;
+					$volume = $volume * 1000000;
+				} else {
+					$volume =~ /.*(K)/;
+					if ($1 eq "K") {
+						$volume =~ s/K//g;
+						$volume = $volume * 1000;
+					}
+				}
+				my $hi52 = $item->{'hi52'};
+				$hi52 =~ s/,//;
+				my $lo52 = $item->{'lo52'};
+				$lo52 =~ s/,//;
 
-		$data = decode_json( $json_str );
-		foreach my $item (@{$data}) {
-			#print "$item->{'ltt'},$item->{'op'},$item->{'hi'},$item->{'lo'},$item->{'l'},$item->{'vo'}\n";
-			undef $stmt;
-			my $name = $item->{'t'};
-			$name =~ s/,//;
-			my $open = $item->{'op'};
-			$open =~ s/,//;
-			my $high = $item->{'hi'};
-			$high =~ s/,//;
-			my $low  = $item->{'lo'};
-			$low =~ s/,//;
-			my $last = $item->{'l_fix'};
-			$last =~ s/,//;
-			my $prev_close = $item->{'pcls_fix'};
-			$prev_close =~ s/,//;
-			my $change = $item->{'c_fix'};
-			$change =~ s/,//;
-			my $change_per = $item->{'cp_fix'};
-			$change_per =~ s/,//;
-			my $volume = $item->{'vo'};
-			$volume =~ s/-/0/;
-			$volume =~ s/m/M/;
-			$volume =~ s/k/K/;
-			$volume =~ s/,//;
-			$volume =~ /.*(M)/;
-			if ($1 eq "M") {
-				$volume =~ s/M//g;
-				$volume = $volume * 1000000;
-			} else {
-				$volume =~ /.*(K)/;
-				if ($1 eq "K") {
-					$volume =~ s/K//g;
-					$volume = $volume * 1000;
-				}	
+				my $time = $item->{'lt_dts'};
+				my $date;
+				$time =~ /(.*)T(.*)Z/;
+				$time = $2;
+				$date = $1;
+				my $stmt = qq(INSERT INTO INTRADAY_DATA (ID,NAME,OPEN,HIGH,LOW,LAST,PREVCLOSE,CHANGE,PERCHANGE,VOLUME,HI52,LO52,TIME,DATE)
+					VALUES ($id, '$name', $open, $high, $low, $last, $prev_close, $change, $change_per, $volume, $hi52, $lo52, '$time', '$date'));
+				my $rv = $dbh->do($stmt) or die print $stmt,$DBI::errstr;
+				$id++;
 			}
-			my $hi52 = $item->{'hi52'};
-			$hi52 =~ s/,//;
-			my $lo52 = $item->{'lo52'};
-			$lo52 =~ s/,//;
-
-			my $time = $item->{'lt_dts'};
-			my $date;
-			$time =~ /(.*)T(.*)Z/;
-			$time = $2;
-			$date = $1;
-			my $stmt = qq(INSERT INTO INTRADAY_DATA (ID,NAME,OPEN,HIGH,LOW,LAST,PREVCLOSE,CHANGE,PERCHANGE,VOLUME,HI52,LO52,TIME,DATE)
-				VALUES ($id, '$name', $open, $high, $low, $last, $prev_close, $change, $change_per, $volume, $hi52, $lo52, '$time', '$date'));
-			my $rv = $dbh->do($stmt) or die $DBI::errstr;
-			$id++;
+		} else {
+			warn "Could not open $url\n";
 		}
 
 		$dbh->disconnect();
@@ -121,10 +125,29 @@ while (1) {
 	}
 
 	my $end_time = time();
-	my $diff_time = ($end_time - $start_time);
+	my $work_time = ($end_time - $start_time);
 	my $delay_in_seconds = 60;
-	my $sleep_time = $delay_in_seconds - $diff_time - $end_time%$delay_in_seconds;
-	my $time_now = DateTime->now( time_zone => 'local' );
+
+	#To ensure alignment with actual clock if drift
+	#in seconds is > delay/2 (seconds)
+	my $rounding = $end_time % $delay_in_seconds;
+	if ($rounding > $delay_in_seconds/2) {
+		$rounding = $delay_in_seconds - $rounding;
+	} else {
+		$rounding = 0;
+	}
+
+	#Adjust the work time to keep getting every delay(60) seconds
+	#And if required move to the next round minute.
+	my $sleep_time = $delay_in_seconds - $work_time + $rounding;
+
+	#If for some reason sleep goes negative,
+	#Sleep at least delay seconds
+	if ($sleep_time < 0) {
+		$sleep_time = $delay_in_seconds;
+	}
+
+	print "Sleeping for $sleep_time\n";
+
 	sleep $sleep_time;
 }
-
