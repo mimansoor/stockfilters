@@ -17,18 +17,18 @@ sub check_for_download_time {
 		$download = 0;
 	} else {
 		#On Week Day's ie., Monday to Friday
-		#Start only after 9:15AM
-		#Stop after 15:30PM
+		#Start only after 9:10AM
+		#Stop after 15:35PM
 		if ($time_now->hour < 9 || $time_now->hour > 15) {
 			$download = 0;
 		} else {
 			if ($time_now->hour == 9) {
-				if ($time_now->minute < 15) {
+				if ($time_now->minute < 10) {
 					$download = 0;
 				}
 			} else {
 				if ($time_now->hour == 15) {
-					if ($time_now->minute > 30) {
+					if ($time_now->minute > 35) {
 						$download = 0;
 					}
 				}
@@ -39,7 +39,7 @@ sub check_for_download_time {
 	return $download;
 }
 
-my $url = "https://www.google.com/finance/info?infotype=infoquoteall&q=NSE:UBL,NSE:JSWSTEEL,NSE:HINDALCO,NSE:TV18BRDCST,NSE:NIFTYJR,NSE:CUMMINSIND,NSE:MARICO,NSE:ADANIPORTS,NSE:BAJFINANCE,NSE:IOC,NSE:INDUSINDBK,NSE:GAIL,NSE:TAKE,NSE:NIFTY,NSE:EMAMILTD,NSE:TALWALKARS,NSE:GRASIM,NSE:BHARTIARTL,NSE:DRREDDY,NSE:TATAPOWER,NSE:CONCOR,NSE:ASIANPAINT,NSE:LICHSGFIN,NSE:ITC,NSE:AUROPHARMA,NSE:BANKNIFTY,NSE:CIPLA,NSE:TITAN,NSE:PFC,NSE:ABB,NSE:DLF,NSE:DIVISLAB,NSE:TATAMOTORS,NSE:AMBUJACEM,NSE:HINDZINC,NSE:SRTRANSFIN,NSE:MCDOWELL-N,NSE:POWERGRID,NSE:INFY,NSE:HAVELLS,NSE:HDFC,NSE:NMDC,NSE:HCLTECH,NSE:GODREJCP,NSE:OIL,NSE:AXISBANK,NSE:KOTAKBANK,NSE:BAJAJFINSV,NSE:TCS,NSE:BANKBARODA,NSE:APOLLOHOSP,NSE:LUPIN,NSE:SBIN,NSE:IDEA,NSE:TECHM,NSE:SIEMENS,NSE:INFRATEL,NSE:ACC,NSE:SUNPHARMA,NSE:MOTHERSUMI,NSE:GLAXO,NSE:INDIGO,NSE:PIDILITIND,NSE:BEL,NSE:COALINDIA,NSE:BRITANNIA,NSE:ICICIBANK,NSE:HINDUNILVR,NSE:CASTROLIND,NSE:LT,NSE:HDFCBANK,NSE:UPL,NSE:VEDL,NSE:KRBL,NSE:RELIANCE,NSE:PNB,NSE:JISLJALEQS,NSE:WIPRO,NSE:BAJAJ-AUTO,NSE:ONGC,NSE:HINDPETRO,NSE:GLENMARK,NSE:PEL,NSE:TORNTPHARM,NSE:DABUR,NSE:RAYMOND,NSE:COLPAL,NSE:BHARATFORG,NSE:ZEEL,NSE:NTPC,NSE:OFSS,NSE:IBULHSGFIN,NSE:HEROMOTOCO,NSE:BHEL,NSE:TATAMTRDVR,NSE:TATASTEEL,NSE:YESBANK,NSE:CADILAHC,NSE:PENIND,NSE:BPCL";
+my $url = "https://www.google.com/finance/info?infotype=infoquoteall&q=NSE:GLAXO,NSE:HDFC,NSE:YESBANK,NSE:SBIN,NSE:CASTROLIND,NSE:TATAMOTORS,NSE:DABUR,NSE:DLF,NSE:DRREDDY,NSE:ONGC,NSE:RELIANCE,NSE:TCS,NSE:LUPIN,NSE:GLENMARK,NSE:HINDALCO,NSE:HAVELLS,NSE:SRTRANSFIN,NSE:HINDPETRO,NSE:INFY,NSE:BRITANNIA,NSE:CADILAHC,NSE:BEL,NSE:INDIGO,NSE:ADANIPORTS,NSE:HINDUNILVR,NSE:OIL,NSE:DIVISLAB,NSE:JSWSTEEL,NSE:NIFTYJR,NSE:INDUSINDBK,NSE:OFSS,NSE:HINDZINC,NSE:UBL,NSE:VEDL,NSE:KOTAKBANK,NSE:TORNTPHARM,NSE:TAKE,NSE:TECHM,NSE:SUNPHARMA,NSE:KRBL,NSE:MARICO,NSE:BHEL,NSE:NTPC,NSE:COLPAL,NSE:BANKBARODA,NSE:BHARATFORG,NSE:UPL,NSE:HDFCBANK,NSE:TALWALKARS,NSE:TATAPOWER,NSE:RAYMOND,NSE:JISLJALEQS,NSE:IOC,NSE:PFC,NSE:CONCOR,NSE:HCLTECH,NSE:TATASTEEL,NSE:TV19BRDCST,NSE:NIFTY,NSE:LICHSGFIN,NSE:ASIANPAINT,NSE:BPCL,NSE:NMDC,NSE:GAIL,NSE:AUROPHARMA,NSE:POWERGRID,NSE:BANKNIFTY,NSE:PNB,NSE:IDEA,NSE:PIDILITIND,NSE:IBULHSGFIN,NSE:MCDOWELL-N,NSE:COALINDIA,NSE:ABB,NSE:MOTHERSUMI,NSE:BAJFINANCE,NSE:HEROMOTOCO,NSE:BAJAJ-AUTO,NSE:ITC,NSE:AXISBANK,NSE:GRASIM,NSE:BAJAJFINSV,NSE:TATAMTRDVR,NSE:WIPRO,NSE:ACC,NSE:LT,NSE:CIPLA,NSE:ICICIBANK,NSE:CUMMINSIND,NSE:SIEMENS,NSE:BHARTIARTL,NSE:ZEEL,NSE:APOLLOHOSP,NSE:AMBUJACEM,NSE:TITAN,NSE:EMAMILTD,NSE:GODREJCP,NSE:INFRATEL,NSE:PEL,NSE:PENIND";
 
 system("cp realtime_data.db tmp_abcdefgh.db");
 
@@ -49,7 +49,7 @@ my $dsn = "DBI:$driver:dbname=$database";
 my $userid = "";
 my $password = "";
 
-$id = 0+1;
+$id = 1;
 $repeat_always = 1;
 
 while ($repeat_always) {
@@ -66,55 +66,57 @@ while ($repeat_always) {
 			my $data;
 
 			$data = decode_json( $json_str );
-			foreach my $item (@{$data}) {
-				#print "$item->{'ltt'},$item->{'op'},$item->{'hi'},$item->{'lo'},$item->{'l'},$item->{'vo'}\n";
-				undef $stmt;
-				my $name = $item->{'t'};
-				$name =~ s/,//;
-				my $open = $item->{'op'};
-				$open =~ s/,//;
-				my $high = $item->{'hi'};
-				$high =~ s/,//;
-				my $low  = $item->{'lo'};
-				$low =~ s/,//;
-				my $last = $item->{'l_fix'};
-				$last =~ s/,//;
-				my $prev_close = $item->{'pcls_fix'};
-				$prev_close =~ s/,//;
-				my $change = $item->{'c_fix'};
-				$change =~ s/,//;
-				my $change_per = $item->{'cp_fix'};
-				$change_per =~ s/,//;
-				my $volume = $item->{'vo'};
-				$volume =~ s/-/0/;
-				$volume =~ s/m/M/;
-				$volume =~ s/k/K/;
-				$volume =~ s/,//;
-				$volume =~ /.*(M)/;
-				if ($1 eq "M") {
-					$volume =~ s/M//g;
-					$volume = $volume * 1000000;
-				} else {
-					$volume =~ /.*(K)/;
-					if ($1 eq "K") {
-						$volume =~ s/K//g;
-						$volume = $volume * 1000;
+			if ($data ne "") {
+				foreach my $item (@{$data}) {
+					#print "$item->{'ltt'},$item->{'op'},$item->{'hi'},$item->{'lo'},$item->{'l'},$item->{'vo'}\n";
+					undef $stmt;
+					my $name = $item->{'t'};
+					$name =~ s/,//;
+					my $open = $item->{'op'};
+					$open =~ s/,//;
+					my $high = $item->{'hi'};
+					$high =~ s/,//;
+					my $low  = $item->{'lo'};
+					$low =~ s/,//;
+					my $last = $item->{'l_fix'};
+					$last =~ s/,//;
+					my $prev_close = $item->{'pcls_fix'};
+					$prev_close =~ s/,//;
+					my $change = $item->{'c_fix'};
+					$change =~ s/,//;
+					my $change_per = $item->{'cp_fix'};
+					$change_per =~ s/,//;
+					my $volume = $item->{'vo'};
+					$volume =~ s/-/0/;
+					$volume =~ s/m/M/;
+					$volume =~ s/k/K/;
+					$volume =~ s/,//;
+					$volume =~ /.*(M)/;
+					if ($1 eq "M") {
+						$volume =~ s/M//g;
+						$volume = $volume * 1000000;
+					} else {
+						$volume =~ /.*(K)/;
+						if ($1 eq "K") {
+							$volume =~ s/K//g;
+							$volume = $volume * 1000;
+						}
 					}
-				}
-				my $hi52 = $item->{'hi52'};
-				$hi52 =~ s/,//;
-				my $lo52 = $item->{'lo52'};
-				$lo52 =~ s/,//;
+					my $hi52 = $item->{'hi52'};
+					$hi52 =~ s/,//;
+					my $lo52 = $item->{'lo52'};
+					$lo52 =~ s/,//;
 
-				my $time = $item->{'lt_dts'};
-				my $date;
-				$time =~ /(.*)T(.*)Z/;
-				$time = $2;
-				$date = $1;
-				my $stmt = qq(INSERT INTO INTRADAY_DATA (ID,NAME,OPEN,HIGH,LOW,LAST,PREVCLOSE,CHANGE,PERCHANGE,VOLUME,HI52,LO52,TIME,DATE)
-					VALUES ($id, '$name', $open, $high, $low, $last, $prev_close, $change, $change_per, $volume, $hi52, $lo52, '$time', '$date'));
-				my $rv = $dbh->do($stmt) or die print $stmt,$DBI::errstr;
-				$id++;
+					my $time = $item->{'lt_dts'};
+					my $date;
+					$time =~ /(.*)T(.*)Z/;
+					$time = $2;
+					$date = $1;
+					my $stmt = qq(INSERT INTO INTRADAY_DATA (ID,NAME,OPEN,HIGH,LOW,LAST,PREVCLOSE,CHANGE,PERCHANGE,VOLUME,HI52,LO52,TIME,DATE)
+						VALUES ($id, '$name', $open, $high, $low, $last, $prev_close, $change, $change_per, $volume, $hi52, $lo52, '$time', '$date'));
+					my $rv = $dbh->do($stmt) or die print $stmt,$DBI::errstr;
+					$id++;
+				}
 			}
 		} else {
 			warn "Could not open $url\n";

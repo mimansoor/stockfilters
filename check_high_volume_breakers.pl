@@ -18,7 +18,7 @@ sub check_for_download_time {
 	} else {
 		#On Week Day's ie., Monday to Friday
 		#Start only after 9:25AM
-		#Stop after 15:30PM
+		#Stop after 15:35PM
 		if ($time_now->hour < 9 || $time_now->hour > 15) {
 			$download = 0;
 		} else {
@@ -28,7 +28,7 @@ sub check_for_download_time {
 				}
 			} else {
 				if ($time_now->hour == 15) {
-					if ($time_now->minute > 30) {
+					if ($time_now->minute > 35) {
 						$download = 0;
 					}
 				}
@@ -159,15 +159,20 @@ while ($repeat_always) {
 			$change_volume[3] =
 				$cur_vol{$stock_name} - $prev_vol{$stock_name};
 
-			my $per_change_vol2 = $change_volume[2] == 0? 0 : ($change_volume[3]/$change_volume[2] -1)*100.0;
-			my $per_change_vol1 = $change_volume[1] == 0? 0 : ($change_volume[2]/$change_volume[1] -1)*100.0;
-			my $per_change_vol0 = $change_volume[0] == 0? 0 : ($change_volume[1]/$change_volume[0] -1)*100.0;
+			my $per_change_vol2 = $change_volume[2] == 0? 0 : ($change_volume[3]/$change_volume[2])*100.0;
+			my $per_change_vol1 = $change_volume[1] == 0? 0 : ($change_volume[2]/$change_volume[1])*100.0;
+			my $per_change_vol0 = $change_volume[0] == 0? 0 : ($change_volume[1]/$change_volume[0])*100.0;
 
-			if ($per_change_vol0 > 2000.0 || $per_change_vol1 > 2000.0 || $per_change_vol2 > 2000.0) {
-				printf("<b><a href=\"http://chartink.com/stocks/%s.html\">%s</a></b>: %.02f (<b>%.02f%%</b>) %.02f (<b>%.02f%%</b>) %.02f (<b>%.02f%%</b>)<br>\n",$stock_name,$stock_name,$change_price[1],$per_change_vol0,$change_price[2],$per_change_vol1,$change_price[3],$per_change_vol2);
+			my $per_change_pr2 = $change_price[2] == 0? 0 : ($change_price[3]/$change_price[2])*100.0;
+			my $per_change_pr1 = $change_price[1] == 0? 0 : ($change_price[2]/$change_price[1])*100.0;
+			my $per_change_pr0 = $change_price[0] == 0? 0 : ($change_price[1]/$change_price[0])*100.0;
+
+			if ($per_change_vol0 > 3000.0 || $per_change_vol1 > 3000.0 || $per_change_vol2 > 3000.0) {
+				printf("<b><a href=\"http://chartink.com/stocks/%s.html\">%s</a></b>(%.02f): %.02f%% (<b>%.02f%%</b>) %.02f%% (<b>%.02f%%</b>) %.02f%% (<b>%.02f%%</b>)<br>\n",$stock_name,$stock_name,$cur_price{$stock_name},$per_change_pr0,$per_change_vol0,$per_change_pr1,$per_change_vol1,$per_change_pr2,$per_change_vol2);
 			}
 		}
 	}
-	print "<h6>Sleeping for $delay_in_seconds</h6> <br>\n";
 	sleep $delay_in_seconds;
+	my $time_now = DateTime->now( time_zone => 'local' );
+	print "<h6>$time_now</h6>\n";
 }

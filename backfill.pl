@@ -14,7 +14,7 @@ my $filename;
 while (my $row = <$fh>) {
 	chomp $row;
 	my $stock_name = $row;
-	my $url = qq(https://www.google.com/finance/getprices?q=$stock_name&x=NSE&i=60&p=15d&f=d,o,h,l,c,v);
+	my $url = qq(https://www.google.com/finance/getprices?q=$stock_name&x=NSE&i=60&p=3d&f=d,o,h,l,c,v);
 	$data = get($url);
 	$filename = qq($stock_name.txt);
 	open(my $fh1, '>', $filename) or die "Could not open file '$filename' $!";
