@@ -23,7 +23,7 @@ open (my $fh, '<', 'Company_names.lst') or die "Could not open file 'Company_nam
 my $data;
 my $filename;
 my $full_time=0;
-my $id=1;
+my $id=887357+1;
 while (my $row = <$fh>) {
 	chomp $row;
 	my $stock_name = $row;
@@ -66,8 +66,10 @@ VALUES ($id, '$date', '$time', '$stock_name', $tokens[1], $tokens[2], $tokens[3]
 
 		$id++;
 	}
-
+	print "Completed importing $stock_name\n";
+	
 	close $fh1;
 }
 
 $dbh->disconnect();
+print "Closed database successfully\n";
