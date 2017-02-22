@@ -79,9 +79,10 @@ my %prev_price;
 my %prev_vol;
 my %cur_price;
 my %cur_vol;
+my %per_change_in_price;
 while ($repeat_always) {
 	if (check_for_download_time()) {
-		system("cp realtime_data.db check_volume.db");
+		system("cp 01realtime_data.db check_volume.db");
 		#print "Copied<br>\n";
 
 		my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
@@ -131,6 +132,7 @@ while ($repeat_always) {
 		while (@data = $sth->fetchrow_array()) {
 		 $cur_price{$data[1]} = $data[5];
 		 $cur_vol{$data[1]} = $data[9];
+		 $per_change_in_price{$data[1]} = $data[8];
 		}
 
 		$dbh->disconnect();
@@ -168,7 +170,7 @@ while ($repeat_always) {
 			my $per_change_pr0 = $change_price[0] == 0? 0 : ($change_price[1]/$change_price[0])*100.0;
 
 			if ($per_change_vol0 > 3000.0 || $per_change_vol1 > 3000.0 || $per_change_vol2 > 3000.0) {
-				printf("<b><a href=\"http://chartink.com/stocks/%s.html\">%s</a></b>(%.02f): %.02f%% (<b>%.02f%%</b>) %.02f%% (<b>%.02f%%</b>) %.02f%% (<b>%.02f%%</b>)<br>\n",$stock_name,$stock_name,$cur_price{$stock_name},$per_change_pr0,$per_change_vol0,$per_change_pr1,$per_change_vol1,$per_change_pr2,$per_change_vol2);
+				printf("<b><a href=\"http://chartink.com/stocks/%s.html\">%s</a></b>(%.02f:%.02f%%): %.02f%% (<b>%.02f%%</b>) %.02f%% (<b>%.02f%%</b>) %.02f%% (<b>%.02f%%</b>)<br>\n",$stock_name,$stock_name,$cur_price{$stock_name},$per_change_in_price{$stock_name},$per_change_pr0,$per_change_vol0,$per_change_pr1,$per_change_vol1,$per_change_pr2,$per_change_vol2);
 			}
 		}
 	}

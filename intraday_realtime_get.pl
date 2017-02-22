@@ -5,6 +5,21 @@ use JSON;
 use LWP::Curl;
 use DBI;
 use DateTime qw(:all);
+use List::Util qw(shuffle);
+
+
+#Read the Stocks Name and randomize the stock url
+open (my $fh, '<', 'mylist.lst') or die "Could not open file 'mylist.lst' $!";
+
+my @mystocks;
+my $i = 0;
+while (my $row = <$fh>) {
+	chomp $row;
+	$mystocks[$i] = $row;
+	$i++;
+}
+
+close $fh;
 
 sub check_for_download_time {
 	my $time_now = DateTime->now( time_zone => 'local' );
@@ -39,9 +54,7 @@ sub check_for_download_time {
 	return $download;
 }
 
-my $url = "https://www.google.com/finance/info?infotype=infoquoteall&q=NSE:GLAXO,NSE:HDFC,NSE:YESBANK,NSE:SBIN,NSE:CASTROLIND,NSE:TATAMOTORS,NSE:DABUR,NSE:DLF,NSE:DRREDDY,NSE:ONGC,NSE:RELIANCE,NSE:TCS,NSE:LUPIN,NSE:GLENMARK,NSE:HINDALCO,NSE:HAVELLS,NSE:SRTRANSFIN,NSE:HINDPETRO,NSE:INFY,NSE:BRITANNIA,NSE:CADILAHC,NSE:BEL,NSE:INDIGO,NSE:ADANIPORTS,NSE:HINDUNILVR,NSE:OIL,NSE:DIVISLAB,NSE:JSWSTEEL,NSE:NIFTYJR,NSE:INDUSINDBK,NSE:OFSS,NSE:HINDZINC,NSE:UBL,NSE:VEDL,NSE:KOTAKBANK,NSE:TORNTPHARM,NSE:TAKE,NSE:TECHM,NSE:SUNPHARMA,NSE:KRBL,NSE:MARICO,NSE:BHEL,NSE:NTPC,NSE:COLPAL,NSE:BANKBARODA,NSE:BHARATFORG,NSE:UPL,NSE:HDFCBANK,NSE:TALWALKARS,NSE:TATAPOWER,NSE:RAYMOND,NSE:JISLJALEQS,NSE:IOC,NSE:PFC,NSE:CONCOR,NSE:HCLTECH,NSE:TATASTEEL,NSE:TV19BRDCST,NSE:NIFTY,NSE:LICHSGFIN,NSE:ASIANPAINT,NSE:BPCL,NSE:NMDC,NSE:GAIL,NSE:AUROPHARMA,NSE:POWERGRID,NSE:BANKNIFTY,NSE:PNB,NSE:IDEA,NSE:PIDILITIND,NSE:IBULHSGFIN,NSE:MCDOWELL-N,NSE:COALINDIA,NSE:ABB,NSE:MOTHERSUMI,NSE:BAJFINANCE,NSE:HEROMOTOCO,NSE:BAJAJ-AUTO,NSE:ITC,NSE:AXISBANK,NSE:GRASIM,NSE:BAJAJFINSV,NSE:TATAMTRDVR,NSE:WIPRO,NSE:ACC,NSE:LT,NSE:CIPLA,NSE:ICICIBANK,NSE:CUMMINSIND,NSE:SIEMENS,NSE:BHARTIARTL,NSE:ZEEL,NSE:APOLLOHOSP,NSE:AMBUJACEM,NSE:TITAN,NSE:EMAMILTD,NSE:GODREJCP,NSE:INFRATEL,NSE:PEL,NSE:PENIND";
-
-system("cp realtime_data.db tmp_abcdefgh.db");
+system("cp 01realtime_data.db tmp_abcdefgh.db");
 
 my $driver   = "SQLite";
 my $database = "tmp_abcdefgh.db";
@@ -58,6 +71,14 @@ while ($repeat_always) {
 		my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
 				      or die $DBI::errstr;
 		my $ua = LWP::Curl->new;
+
+		my @shuffled_company = shuffle @mystocks;
+		my $url = qq(https://www.google.com/finance/info?infotype=infoquoteall&q=);
+		foreach my $row (@shuffled_company) {
+			$url .= qq(NSE:$row,);
+		}
+		$url =~ s/,$//g;
+
 		my $json_str = $ua->get($url);
 		if (defined $json_str)
 		{
@@ -114,7 +135,7 @@ while ($repeat_always) {
 					$date = $1;
 					my $stmt = qq(INSERT INTO INTRADAY_DATA (ID,NAME,OPEN,HIGH,LOW,LAST,PREVCLOSE,CHANGE,PERCHANGE,VOLUME,HI52,LO52,TIME,DATE)
 						VALUES ($id, '$name', $open, $high, $low, $last, $prev_close, $change, $change_per, $volume, $hi52, $lo52, '$time', '$date'));
-					my $rv = $dbh->do($stmt) or die print $stmt,$DBI::errstr;
+					my $rv = $dbh->do($stmt) or die print $stmt."\n",$DBI::errstr;
 					$id++;
 				}
 			}
@@ -123,7 +144,7 @@ while ($repeat_always) {
 		}
 
 		$dbh->disconnect();
-		system("cp tmp_abcdefgh.db realtime_data.db");
+		system("cp tmp_abcdefgh.db 01realtime_data.db");
 	}
 
 	my $end_time = time();
