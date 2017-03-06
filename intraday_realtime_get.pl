@@ -32,13 +32,13 @@ sub check_for_download_time {
 		$download = 0;
 	} else {
 		#On Week Day's ie., Monday to Friday
-		#Start only after 9:10AM
+		#Start only after 9:20AM
 		#Stop after 15:35PM
 		if ($time_now->hour < 9 || $time_now->hour > 15) {
 			$download = 0;
 		} else {
 			if ($time_now->hour == 9) {
-				if ($time_now->minute < 10) {
+				if ($time_now->minute < 20) {
 					$download = 0;
 				}
 			} else {
@@ -89,7 +89,6 @@ while ($repeat_always) {
 			$data = decode_json( $json_str );
 			if ($data ne "") {
 				foreach my $item (@{$data}) {
-					#print "$item->{'ltt'},$item->{'op'},$item->{'hi'},$item->{'lo'},$item->{'l'},$item->{'vo'}\n";
 					undef $stmt;
 					my $name = $item->{'t'};
 					$name =~ s/,//;
@@ -135,7 +134,8 @@ while ($repeat_always) {
 					$date = $1;
 					my $stmt = qq(INSERT INTO INTRADAY_DATA (ID,NAME,OPEN,HIGH,LOW,LAST,PREVCLOSE,CHANGE,PERCHANGE,VOLUME,HI52,LO52,TIME,DATE)
 						VALUES ($id, '$name', $open, $high, $low, $last, $prev_close, $change, $change_per, $volume, $hi52, $lo52, '$time', '$date'));
-					my $rv = $dbh->do($stmt) or die print $stmt."\n",$DBI::errstr;
+					#my $rv = $dbh->do($stmt) or warn print $stmt."\n",$DBI::errstr,goto to_sleep;
+					my $rv = $dbh->do($stmt) or warn print "$stmt\n" and goto to_sleep;
 					$id++;
 				}
 			}
@@ -147,6 +147,7 @@ while ($repeat_always) {
 		system("cp tmp_abcdefgh.db 01realtime_data.db");
 	}
 
+to_sleep:
 	my $end_time = time();
 	my $work_time = ($end_time - $start_time);
 	my $delay_in_seconds = 60;
@@ -154,10 +155,10 @@ while ($repeat_always) {
 	#To ensure alignment with actual clock if drift
 	#in seconds is > delay/2 (seconds)
 	my $rounding = $end_time % $delay_in_seconds;
-	if ($rounding > $delay_in_seconds/2) {
+	if ($rounding > $delay_in_seconds/4) {
 		$rounding = $delay_in_seconds - $rounding;
 	} else {
-		$rounding = 0;
+		$rounding *= -1;
 	}
 
 	#Adjust the work time to keep getting every delay(60) seconds
@@ -166,7 +167,7 @@ while ($repeat_always) {
 
 	#If for some reason sleep goes negative,
 	#Sleep at least delay seconds
-	if ($sleep_time < 0) {
+	if ($sleep_time <= 0) {
 		$sleep_time = $delay_in_seconds;
 	}
 
