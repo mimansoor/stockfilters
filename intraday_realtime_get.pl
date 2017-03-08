@@ -62,7 +62,7 @@ my $dsn = "DBI:$driver:dbname=$database";
 my $userid = "";
 my $password = "";
 
-$id = 1;
+$id = time();
 $repeat_always = 1;
 
 while ($repeat_always) {
@@ -136,7 +136,7 @@ while ($repeat_always) {
 						VALUES ($id, '$name', $open, $high, $low, $last, $prev_close, $change, $change_per, $volume, $hi52, $lo52, '$time', '$date'));
 					#my $rv = $dbh->do($stmt) or warn print $stmt."\n",$DBI::errstr,goto to_sleep;
 					my $rv = $dbh->do($stmt) or warn print "$stmt\n" and goto to_sleep;
-					$id++;
+					$id = time();
 				}
 			}
 		} else {
