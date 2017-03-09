@@ -38,12 +38,12 @@ sub check_for_download_time {
 			$download = 0;
 		} else {
 			if ($time_now->hour == 9) {
-				if ($time_now->minute < 20) {
+				if ($time_now->minute < 17) {
 					$download = 0;
 				}
 			} else {
 				if ($time_now->hour == 15) {
-					if ($time_now->minute > 35) {
+					if ($time_now->minute > 32) {
 						$download = 0;
 					}
 				}
@@ -62,12 +62,12 @@ my $dsn = "DBI:$driver:dbname=$database";
 my $userid = "";
 my $password = "";
 
-$id = time();
 $repeat_always = 1;
 
 while ($repeat_always) {
 	my $start_time = time();
 	if (check_for_download_time()) {
+		$id = $start_time*1000;
 		my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
 				      or die $DBI::errstr;
 		my $ua = LWP::Curl->new;
@@ -136,7 +136,7 @@ while ($repeat_always) {
 						VALUES ($id, '$name', $open, $high, $low, $last, $prev_close, $change, $change_per, $volume, $hi52, $lo52, '$time', '$date'));
 					#my $rv = $dbh->do($stmt) or warn print $stmt."\n",$DBI::errstr,goto to_sleep;
 					my $rv = $dbh->do($stmt) or warn print "$stmt\n" and goto to_sleep;
-					$id = time();
+					$id++;
 				}
 			}
 		} else {
