@@ -37,13 +37,13 @@ sub check_for_download_time {
 
 	#Do not download on Saturday's and Sunday's
 	#Saturday == 6, Sunday == 7
-	if ($dow == 6 || $dow == 7) {
+	if ($dow == 6 or $dow == 7) {
 		$download = 0;
 	} else {
 		#On Week Day's ie., Monday to Friday
 		#Start only after 9:18AM
 		#Stop after 15:30PM
-		if ($time_now->hour < 9 || $time_now->hour > 15) {
+		if ($time_now->hour < 9 or $time_now->hour > 15) {
 			$download = 0;
 		} else {
 			if ($time_now->hour == 9) {
@@ -215,7 +215,7 @@ while ($repeat_always) {
 			#	Buy: When you find a Non-zero high_change with high_volumes
 			#	Sell: When you find a Non-zero low_change with high_volumes
 			if ((defined $last_row[$STOCK_HIGH_VOL]) and ($last_row[$STOCK_HIGH_VOL] == 1)
-				and ($last_row[$STOCK_LO_CNG] != 0 || $last_row[$STOCK_HI_CNG] != 0)) {
+				and ($last_row[$STOCK_LO_CNG] != 0 or $last_row[$STOCK_HI_CNG] != 0)) {
 				my $recommendation = "Short_Sell";
 
 				my $stop_loss_price = 0.0;
@@ -224,7 +224,7 @@ while ($repeat_always) {
 				my $trade_trigerred = 0;
 				#Dont enter if we closed the position just in the last bar,
 				#It is possible to see this since we sample twice.
-				if (($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name}) and
+				if ((!defined $close_trade_exit_time{$stock_name} or ($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
 				    ($last_row[$STOCK_LO_CNG] != 0) and ($stock_price < ($last_row[$STOCK_LOW]*(1+$low_threshold/100)))) {
 					$recommendation = "Buy";
 					$profit_price = sprintf("%.2f",$stock_price*(1+$profit_percentage/100));
@@ -233,7 +233,7 @@ while ($repeat_always) {
 				} else {
 					#Dont enter if we closed the position just in the last bar,
 					#It is possible to see this since we sample twice.
-					if (($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name}) and
+					if ((!defined $close_trade_exit_time{$stock_name} or ($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
 					    ($last_row[$STOCK_HI_CNG] != 0) and ($stock_price > ($last_row[$STOCK_HIGH]*(1-$high_threshold/100)))) {
 						$profit_price = sprintf("%.2f",$stock_price*(1-$profit_percentage/100));
 						$stop_loss_price = sprintf("%.2f",$stock_price*(1+$stop_loss_percentage/100));
@@ -248,7 +248,7 @@ while ($repeat_always) {
 					}
 
 					#Check with current open trades, if its same direction then ignore.
-					if (!defined $open_trade_type{$stock_name} || $open_trade_type{$stock_name} ne $recommendation) {
+					if (!defined $open_trade_type{$stock_name} or $open_trade_type{$stock_name} ne $recommendation) {
 						#Check if its new trade recommendation.
 						my $new_trade = 0;
 						if (!defined $open_trade_type{$stock_name}) {
@@ -307,7 +307,8 @@ while ($repeat_always) {
 			}
 
 			#Update last_price and check if we need to close the trade due to profit or stop loss trigger.
-			if (defined $open_trade_type{$stock_name}) {
+			#Update only if last_row has valid data.
+			if (defined $last_row[$STOCK_ID] and defined $open_trade_type{$stock_name}) {
 				my $database = "high_volume_calls.db";
 				my $dsn = "DBI:$driver:dbname=$database";
 				my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1, AutoCommit => 1 })
@@ -320,16 +321,16 @@ while ($repeat_always) {
 				my $closing_price = $stock_price;
 
 				#If low or high changed only then consider the low and high prices else use the last price.
-				if (!defined $last_row[$STOCK_HI_CNG] and $last_row[$STOCK_HI_CNG] == 0.0) {
+				if ($last_row[$STOCK_HI_CNG] == 0.0) {
 					$open_trade_high{$stock_name} = $stock_price;
 				}
 
-				if (!defined $last_row[$STOCK_LO_CNG] and $last_row[$STOCK_LO_CNG] == 0.0) {
+				if ($last_row[$STOCK_LO_CNG] == 0.0) {
 					$open_trade_low{$stock_name} = $stock_price;
 				}
 
 				if ($open_trade_type{$stock_name} eq "Buy") {
-					if (($open_trade_profit_price{$stock_name} <= $stock_price) || ($open_trade_profit_price{$stock_name} <= $open_trade_high{$stock_name}) ||
+					if (($open_trade_profit_price{$stock_name} <= $stock_price) or ($open_trade_profit_price{$stock_name} <= $open_trade_high{$stock_name}) or
 					    ($open_trade_stop_loss_price{$stock_name} >= $stock_price)) {
 
 						#Due to twice sampling freq, the same bar can be seen twice,
@@ -349,7 +350,7 @@ while ($repeat_always) {
 
 					$profit_loss = sprintf("%.2f",(($closing_price - $open_trade_entry_price{$stock_name})*$quantity-$trade_commission));
 				} else {
-					if (($open_trade_profit_price{$stock_name} >= $stock_price) || ($open_trade_profit_price{$stock_name} >= $open_trade_low{$stock_name}) ||
+					if (($open_trade_profit_price{$stock_name} >= $stock_price) or ($open_trade_profit_price{$stock_name} >= $open_trade_low{$stock_name}) or
 					    ($open_trade_stop_loss_price{$stock_name} <= $stock_price)) {
 						#Due to twice sampling freq, the same bar can be seen twice,
 						#So check for last_row time if same as entry_time then dont close.
