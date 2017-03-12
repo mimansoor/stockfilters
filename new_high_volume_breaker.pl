@@ -170,6 +170,27 @@ while ($repeat_always) {
 			$dbh->disconnect();
 		}
 
+		#Cache into memory Close Trade Ledger for this stock.
+		my %close_trade_exit_time;
+
+		#Just want to create a scope for local variables.
+		if (1) {
+			my $high_vol_db = "high_volume_calls.db";
+			my $dsn = "DBI:$driver:dbname=$high_vol_db";
+			my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
+					      or die $DBI::errstr;
+			my $stmt = qq(SELECT * FROM high_volume_calls_v2 WHERE TRADE_STATUS='CLOSED' order by exit_time asc);
+			my $sth = $dbh->prepare($stmt) or die $DBI::errstr;
+			$sth->execute();
+
+			#Let it overwrite the exit_time so we get the last trade exit time only.
+			while (my @data = $sth->fetchrow_array()) {
+				$close_trade_exit_time{$data[1]} = $data[11];
+			}
+			$sth->finish();
+			$dbh->disconnect();
+		}
+
 		#For each stock check if trade triggered
 		foreach my $stock_name (sort keys %cur_price)
 		{
@@ -200,15 +221,20 @@ while ($repeat_always) {
 				my $stop_loss_price = 0.0;
 				my $profit_price = 0.0;
 
-				#this is bar_price_change
 				my $trade_trigerred = 0;
-				if (($last_row[$STOCK_LO_CNG] != 0) and ($stock_price < ($last_row[$STOCK_LOW]*(1+$low_threshold/100)))) {
+				#Dont enter if we closed the position just in the last bar,
+				#It is possible to see this since we sample twice.
+				if (($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name}) and
+				    ($last_row[$STOCK_LO_CNG] != 0) and ($stock_price < ($last_row[$STOCK_LOW]*(1+$low_threshold/100)))) {
 					$recommendation = "Buy";
 					$profit_price = sprintf("%.2f",$stock_price*(1+$profit_percentage/100));
 					$stop_loss_price = sprintf("%.2f",$stock_price*(1-$stop_loss_percentage/100));
 					$trade_trigerred = 1;
 				} else {
-					if (($last_row[$STOCK_HI_CNG] != 0) and ($stock_price > ($last_row[$STOCK_HIGH]*(1-$high_threshold/100)))) {
+					#Dont enter if we closed the position just in the last bar,
+					#It is possible to see this since we sample twice.
+					if (($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name}) and
+					    ($last_row[$STOCK_HI_CNG] != 0) and ($stock_price > ($last_row[$STOCK_HIGH]*(1-$high_threshold/100)))) {
 						$profit_price = sprintf("%.2f",$stock_price*(1-$profit_percentage/100));
 						$stop_loss_price = sprintf("%.2f",$stock_price*(1+$stop_loss_percentage/100));
 						$trade_trigerred = 1;
