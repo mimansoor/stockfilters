@@ -32,8 +32,8 @@ sub check_for_download_time {
 		$download = 0;
 	} else {
 		#On Week Day's ie., Monday to Friday
-		#Start only after 9:20AM
-		#Stop after 15:35PM
+		#Start only after 9:17AM
+		#Stop after 15:31PM
 		if ($time_now->hour < 9 || $time_now->hour > 15) {
 			$download = 0;
 		} else {
@@ -43,7 +43,7 @@ sub check_for_download_time {
 				}
 			} else {
 				if ($time_now->hour == 15) {
-					if ($time_now->minute > 32) {
+					if ($time_now->minute > 31) {
 						$download = 0;
 					}
 				}

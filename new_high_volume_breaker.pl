@@ -68,8 +68,8 @@ sub check_for_download_time {
 STDOUT->autoflush(1);
 
 my $driver   = "SQLite";
-my $database = "check_volume1.db";
-my $dsn = "DBI:$driver:dbname=$database";
+my $database_vol = "check_volume1.db";
+my $dsn = "DBI:$driver:dbname=$database_vol";
 my $userid = "";
 my $password = "";
 
@@ -96,10 +96,12 @@ my %time_of_last_price;
 my %date_of_last_price;
 my $lot_size_in_cash = 300000;
 my $trade_commission = 200;
-my $stop_loss_percentage = 0.25;
-my $profit_percentage = $stop_loss_percentage*2;
+my $stop_loss_percentage = 1.00;
+my $profit_percentage = $stop_loss_percentage*6;
+my $cash_profit_target = 40000;
 my $low_threshold = 0.25;
 my $high_threshold = 0.25;
+my $profit_dec_rate_per = 0.005;
 
 while ($repeat_always) {
 	my $start_time = time();
@@ -109,9 +111,9 @@ while ($repeat_always) {
 
 	if (check_for_download_time()) {
 		if ($simulation) {
-			system("cp realtime_copy.db $database");
+			system("cp realtime_copy.db $database_vol");
 		} else {
-			system("cp 01realtime_data.db $database");
+			system("cp 01realtime_data.db $database_vol");
 		}
 
 		#Get the lastest price cached for all stocks.
@@ -212,11 +214,11 @@ while ($repeat_always) {
 		
 			#This is high_volume == 1, if trade triggered.
 			#Buy/Sell Algo
-			#	Buy: When you find a Non-zero high_change with high_volumes
-			#	Sell: When you find a Non-zero low_change with high_volumes
+			#	Buy: When you find a Non-zero low_change with high_volumes
+			#	Sell: When you find a Non-zero high_change with high_volumes
 			if ((defined $last_row[$STOCK_HIGH_VOL]) and ($last_row[$STOCK_HIGH_VOL] == 1)
 				and ($last_row[$STOCK_LO_CNG] != 0 or $last_row[$STOCK_HI_CNG] != 0)) {
-				my $recommendation = "Short_Sell";
+				my $recommendation;
 
 				my $stop_loss_price = 0.0;
 				my $profit_price = 0.0;
@@ -225,7 +227,7 @@ while ($repeat_always) {
 				#Dont enter if we closed the position just in the last bar,
 				#It is possible to see this since we sample twice.
 				if ((!defined $close_trade_exit_time{$stock_name} or ($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
-				    ($last_row[$STOCK_LO_CNG] != 0) and ($stock_price < ($last_row[$STOCK_LOW]*(1+$low_threshold/100)))) {
+				    ($last_row[$STOCK_HI_CNG] != 0) and ($stock_price > ($last_row[$STOCK_HIGH]*(1-$high_threshold/100)))) {
 					$recommendation = "Buy";
 					$profit_price = sprintf("%.2f",$stock_price*(1+$profit_percentage/100));
 					$stop_loss_price = sprintf("%.2f",$stock_price*(1-$stop_loss_percentage/100));
@@ -234,7 +236,8 @@ while ($repeat_always) {
 					#Dont enter if we closed the position just in the last bar,
 					#It is possible to see this since we sample twice.
 					if ((!defined $close_trade_exit_time{$stock_name} or ($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
-					    ($last_row[$STOCK_HI_CNG] != 0) and ($stock_price > ($last_row[$STOCK_HIGH]*(1-$high_threshold/100)))) {
+					    ($last_row[$STOCK_LO_CNG] != 0) and ($stock_price < ($last_row[$STOCK_LOW]*(1+$low_threshold/100)))) {
+						$recommendation = "Short_Sell";
 						$profit_price = sprintf("%.2f",$stock_price*(1-$profit_percentage/100));
 						$stop_loss_price = sprintf("%.2f",$stock_price*(1+$stop_loss_percentage/100));
 						$trade_trigerred = 1;
@@ -269,12 +272,13 @@ while ($repeat_always) {
 
 						#If New Trade just Insert Row
 						if ($new_trade) {
-							my $insert_stmt = qq(INSERT INTO high_volume_calls_v2 (ID, NAME, DATE, ENTRY_TIME, ENTRY_PRICE, TRADE_TYPE, PROFIT_PRICE, STOP_LOSS_PRICE, PROFIT_LOSS, TRADE_STATUS, CURRENT_PRICE, EXIT_TIME)
-										VALUES ($insert_id, '$stock_name', '$date_of_last_price{$stock_name}', '$time_of_last_price{$stock_name}', $stock_price, '$recommendation', $profit_price, $stop_loss_price, -200, 'OPEN', $stock_price, '$time_of_last_price{$stock_name}'));
+							my $insert_stmt = qq(INSERT INTO high_volume_calls_v2 (ID, NAME, DATE, ENTRY_TIME, ENTRY_PRICE, TRADE_TYPE, PROFIT_PRICE, STOP_LOSS_PRICE, STOP_PROFIT, PROFIT_LOSS, TRADE_STATUS, CURRENT_PRICE, EXIT_TIME)
+										VALUES ($insert_id, '$stock_name', '$date_of_last_price{$stock_name}', '$time_of_last_price{$stock_name}', $stock_price, '$recommendation', $profit_price, $stop_loss_price, -200.0, -200.0, 'OPEN', $stock_price, '$time_of_last_price{$stock_name}'));
 							my $rv = $dbh->do($insert_stmt) or warn print "$insert_stmt\n";
 						} else {
 							#Close the old trade, and and new trade.
-							my $profit_loss = 0;
+							my $profit_loss = 0.0;
+							my $stop_profit = 0.0;
 							my $quantity = floor($lot_size_in_cash/$open_trade_entry_price{$stock_name});
 							my $closing_price = $stock_price;
 
@@ -282,19 +286,21 @@ while ($repeat_always) {
 								$closing_price = ($open_trade_profit_price{$stock_name} <= $stock_price) ? $open_trade_profit_price{$stock_name} :
 										    ($open_trade_stop_loss_price{$stock_name} >= $stock_price) ? $open_trade_stop_loss_price{$stock_name} : $stock_price;
 								$profit_loss = sprintf("%.2f",(($closing_price - $open_trade_entry_price{$stock_name})*$quantity-$trade_commission));
+								$stop_profit = sprintf("%.2f",(($closing_price - $open_trade_stop_loss_price{$stock_name})*$quantity-$trade_commission));
 							} else {
 								$closing_price = ($open_trade_profit_price{$stock_name} >= $stock_price) ? $open_trade_profit_price{$stock_name} :
 										    ($open_trade_stop_loss_price{$stock_name} <= $stock_price) ? $open_trade_stop_loss_price{$stock_name} : $stock_price;
 								$profit_loss = sprintf("%.2f",(($open_trade_entry_price{$stock_name} - $closing_price)*$quantity-$trade_commission));
+								$stop_profit = sprintf("%.2f",(($open_trade_stop_loss_price{$stock_name} - $closing_price)*$quantity-$trade_commission));
 							}
 							my $update_stmt = qq(UPDATE high_volume_calls_v2 set TRADE_STATUS = 'CLOSED',
-									 CURRENT_PRICE = $stock_price, PROFIT_LOSS = $profit_loss,
+									 CURRENT_PRICE = $stock_price, STOP_PROFIT = $stop_profit, PROFIT_LOSS = $profit_loss,
 									 EXIT_TIME = '$time_of_last_price{$stock_name}' WHERE ID == $open_trade_id{$stock_name};);
 							my $my_ledger_rv = $dbh->do($update_stmt) or die $DBI::errstr;
 
 							#Now add the new record
-							my $insert_stmt = qq(INSERT INTO high_volume_calls_v2 (ID, NAME, DATE, ENTRY_TIME, ENTRY_PRICE, TRADE_TYPE, PROFIT_PRICE, STOP_LOSS_PRICE, PROFIT_LOSS, TRADE_STATUS, CURRENT_PRICE, EXIT_TIME)
-										VALUES ($insert_id, '$stock_name', '$date_of_last_price{$stock_name}', '$time_of_last_price{$stock_name}', $stock_price, '$recommendation', $profit_price, $stop_loss_price, -200.0, 'OPEN', $stock_price, '$time_of_last_price{$stock_name}'));
+							my $insert_stmt = qq(INSERT INTO high_volume_calls_v2 (ID, NAME, DATE, ENTRY_TIME, ENTRY_PRICE, TRADE_TYPE, PROFIT_PRICE, STOP_LOSS_PRICE, STOP_PROFIT, PROFIT_LOSS, TRADE_STATUS, CURRENT_PRICE, EXIT_TIME)
+										VALUES ($insert_id, '$stock_name', '$date_of_last_price{$stock_name}', '$time_of_last_price{$stock_name}', $stock_price, '$recommendation', $profit_price, $stop_loss_price, -200.0, -200.0, 'OPEN', $stock_price, '$time_of_last_price{$stock_name}'));
 
 							#make sure update last_price code doesn't see this
 							undef $open_trade_type{$stock_name};
@@ -315,7 +321,8 @@ while ($repeat_always) {
 						      or die $DBI::errstr;
 				my $trade_status = "OPEN";
 
-				my $profit_loss = 0;
+				my $profit_loss = 0.0;
+				my $stop_profit = 0.0;
 				my $quantity = floor($lot_size_in_cash/$open_trade_entry_price{$stock_name});
 
 				my $closing_price = $stock_price;
@@ -340,15 +347,12 @@ while ($repeat_always) {
 						}
 					}
 
-					if ($trade_status eq "CLOSED") {
-						$closing_price = ($open_trade_profit_price{$stock_name} <= $stock_price) ? $open_trade_profit_price{$stock_name} :
-								 ($open_trade_profit_price{$stock_name} <= $open_trade_high{$stock_name}) ? $open_trade_profit_price{$stock_name} :
-								 $stock_price;
-					} else {
-						$closing_price = $stock_price;
-					}
+					$closing_price = ($trade_status eq "CLOSED") ? (($open_trade_profit_price{$stock_name} <= $stock_price) ?
+							 $open_trade_profit_price{$stock_name} : ($open_trade_profit_price{$stock_name} <= $open_trade_high{$stock_name}) ?
+							 $open_trade_profit_price{$stock_name} : $open_trade_stop_loss_price{$stock_name}) : $stock_price;
 
 					$profit_loss = sprintf("%.2f",(($closing_price - $open_trade_entry_price{$stock_name})*$quantity-$trade_commission));
+					$stop_profit = sprintf("%.2f",(($stock_price - $open_trade_stop_loss_price{$stock_name})*$quantity-$trade_commission));
 				} else {
 					if (($open_trade_profit_price{$stock_name} >= $stock_price) or ($open_trade_profit_price{$stock_name} >= $open_trade_low{$stock_name}) or
 					    ($open_trade_stop_loss_price{$stock_name} <= $stock_price)) {
@@ -359,19 +363,46 @@ while ($repeat_always) {
 						}
 					}
 
-					if ($trade_status eq "CLOSED") {
-						$closing_price = ($open_trade_profit_price{$stock_name} >= $stock_price) ? $open_trade_profit_price{$stock_name} :
-							 ($open_trade_profit_price{$stock_name} >= $open_trade_low{$stock_name}) ? $open_trade_profit_price{$stock_name} :
-							 $stock_price;
-					} else {
-						$closing_price = $stock_price;
-					}
+					$closing_price = ($trade_status eq "CLOSED") ? (($open_trade_profit_price{$stock_name} >= $stock_price) ?
+							 $open_trade_profit_price{$stock_name} : ($open_trade_profit_price{$stock_name} >= $open_trade_low{$stock_name}) ?
+							 $open_trade_profit_price{$stock_name} : $open_trade_stop_loss_price{$stock_name}) : $stock_price;
 
 					$profit_loss = sprintf("%.2f",(($open_trade_entry_price{$stock_name} - $closing_price)*$quantity-$trade_commission));
+					$stop_profit = sprintf("%.2f",(($open_trade_stop_loss_price{$stock_name} - $stock_price)*$quantity-$trade_commission));
 				}
 
+				#Close position if we met minimum profit.
+				if ($profit_loss > $cash_profit_target) {
+					$trade_status = "CLOSED";
+				}
+
+				#Update trailing stop loss if price is moving up
+				#Update profit @ profit_dec_rate_per
+				my $profit_target = $open_trade_profit_price{$stock_name};
+				my $stop_loss = $open_trade_stop_loss_price{$stock_name};
+				if ($trade_status ne "CLOSED") {
+					if ($open_trade_type{$stock_name} eq "Buy") {
+						my $st = sprintf("%.4f",$closing_price*(1-$stop_loss_percentage/100));
+						if ($stop_loss < $st) {
+							$stop_loss = $st;
+						}
+						$profit_target *= (1 - $profit_dec_rate_per/100);
+					} else {
+						my $st = sprintf("%.4f",$closing_price*(1+$stop_loss_percentage/100));
+						if ($stop_loss > $st) {
+							$stop_loss = $st;
+						}
+
+						$profit_target *= (1 + $profit_dec_rate_per/100);
+					}
+				}
+
+				$profit_target = sprintf("%.04f", $profit_target);
+				$stop_profit = sprintf("%.04f", $stop_profit);
+
 				my $update_stmt = qq(UPDATE high_volume_calls_v2 set TRADE_STATUS = '$trade_status',
-							CURRENT_PRICE = $closing_price, PROFIT_LOSS = $profit_loss,
+							CURRENT_PRICE = $closing_price, PROFIT_PRICE = $profit_target,
+							STOP_LOSS_PRICE = $stop_loss, STOP_PROFIT = $stop_profit, PROFIT_LOSS = $profit_loss,
 							EXIT_TIME = '$time_of_last_price{$stock_name}' WHERE ID == $open_trade_id{$stock_name};);
 				my $my_ledger_rv = $dbh->do($update_stmt) or die $DBI::errstr;
 
