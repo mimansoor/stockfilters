@@ -8,8 +8,8 @@ use POSIX;
 use strict;
 use warnings;
 
-my $simulation = 1;
-my $send_email = 0;
+my $simulation = 0;
+my $send_email = 1;
 
 #View filed indexes
 my $STOCK_ID 		= 0;
@@ -261,7 +261,7 @@ while ($repeat_always) {
 						#If its not a new trade then its Cover and Reverse.
 						my $email_recommendation = $new_trade == 1 ? $recommendation : "Cover Old And $recommendation";
 
-						my $email_cmd = qq(-s "Fourways Profit: $report_simulation $time_of_last_price{$stock_name}: $email_recommendation $stock_name \($stock_price\) Target: $profit_price StopLoss: $stop_loss_price" mimansoor\@gmail.com,lksingh74\@gmail.com < /dev/null);
+						my $email_cmd = qq(-s "Fourways Profit: $report_simulation $time_of_last_price{$stock_name}: $email_recommendation $stock_name \($stock_price\) Target: $profit_price StopLoss: $stop_loss_price" mimansoor\@gmail.com < /dev/null);
 						my $email_sent = $send_email == 1? system("$email_program $email_cmd") : 0;
 
 						#Now store it in a DB with Buy, take profit and stop loss values
@@ -286,13 +286,15 @@ while ($repeat_always) {
 								$closing_price = ($open_trade_profit_price{$stock_name} <= $stock_price) ? $open_trade_profit_price{$stock_name} :
 										    ($open_trade_stop_loss_price{$stock_name} >= $stock_price) ? $open_trade_stop_loss_price{$stock_name} : $stock_price;
 								$profit_loss = sprintf("%.2f",(($closing_price - $open_trade_entry_price{$stock_name})*$quantity-$trade_commission));
-								$stop_profit = sprintf("%.2f",(($closing_price - $open_trade_stop_loss_price{$stock_name})*$quantity-$trade_commission));
+								$stop_profit = sprintf("%.2f",(($open_trade_stop_loss_price{$stock_name} - $open_trade_entry_price{$stock_name})*$quantity-$trade_commission));
 							} else {
 								$closing_price = ($open_trade_profit_price{$stock_name} >= $stock_price) ? $open_trade_profit_price{$stock_name} :
 										    ($open_trade_stop_loss_price{$stock_name} <= $stock_price) ? $open_trade_stop_loss_price{$stock_name} : $stock_price;
 								$profit_loss = sprintf("%.2f",(($open_trade_entry_price{$stock_name} - $closing_price)*$quantity-$trade_commission));
-								$stop_profit = sprintf("%.2f",(($open_trade_stop_loss_price{$stock_name} - $closing_price)*$quantity-$trade_commission));
+								$stop_profit = sprintf("%.2f",(($open_trade_entry_price{$stock_name} - $open_trade_stop_loss_price{$stock_name})*$quantity-$trade_commission));
 							}
+							$stop_profit = sprintf("%.02f", $stop_profit);
+							$profit_loss = sprintf("%.02f", $profit_loss);
 							my $update_stmt = qq(UPDATE high_volume_calls_v2 set TRADE_STATUS = 'CLOSED',
 									 CURRENT_PRICE = $stock_price, STOP_PROFIT = $stop_profit, PROFIT_LOSS = $profit_loss,
 									 EXIT_TIME = '$time_of_last_price{$stock_name}' WHERE ID == $open_trade_id{$stock_name};);
@@ -352,7 +354,7 @@ while ($repeat_always) {
 							 $open_trade_profit_price{$stock_name} : $open_trade_stop_loss_price{$stock_name}) : $stock_price;
 
 					$profit_loss = sprintf("%.2f",(($closing_price - $open_trade_entry_price{$stock_name})*$quantity-$trade_commission));
-					$stop_profit = sprintf("%.2f",(($stock_price - $open_trade_stop_loss_price{$stock_name})*$quantity-$trade_commission));
+					$stop_profit = sprintf("%.2f",(($open_trade_stop_loss_price{$stock_name} - $open_trade_entry_price{$stock_name})*$quantity-$trade_commission));
 				} else {
 					if (($open_trade_profit_price{$stock_name} >= $stock_price) or ($open_trade_profit_price{$stock_name} >= $open_trade_low{$stock_name}) or
 					    ($open_trade_stop_loss_price{$stock_name} <= $stock_price)) {
@@ -368,7 +370,7 @@ while ($repeat_always) {
 							 $open_trade_profit_price{$stock_name} : $open_trade_stop_loss_price{$stock_name}) : $stock_price;
 
 					$profit_loss = sprintf("%.2f",(($open_trade_entry_price{$stock_name} - $closing_price)*$quantity-$trade_commission));
-					$stop_profit = sprintf("%.2f",(($open_trade_stop_loss_price{$stock_name} - $stock_price)*$quantity-$trade_commission));
+					$stop_profit = sprintf("%.2f",(($open_trade_entry_price{$stock_name} - $open_trade_stop_loss_price{$stock_name})*$quantity-$trade_commission));
 				}
 
 				#Close position if we met minimum profit.
@@ -398,7 +400,8 @@ while ($repeat_always) {
 				}
 
 				$profit_target = sprintf("%.04f", $profit_target);
-				$stop_profit = sprintf("%.04f", $stop_profit);
+				$stop_profit = sprintf("%.02f", $stop_profit);
+				$profit_loss = sprintf("%.02f", $profit_loss);
 
 				my $update_stmt = qq(UPDATE high_volume_calls_v2 set TRADE_STATUS = '$trade_status',
 							CURRENT_PRICE = $closing_price, PROFIT_PRICE = $profit_target,
