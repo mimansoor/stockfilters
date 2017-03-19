@@ -8,8 +8,8 @@ use POSIX;
 use strict;
 use warnings;
 
-my $simulation = 0;
-my $send_email = 1;
+my $simulation = 1;
+my $send_email = 0;
 
 #View filed indexes
 my $STOCK_ID 		= 0;
@@ -63,6 +63,18 @@ sub check_for_download_time {
 	return $download;
 }
 
+sub can_open_trade_time {
+	my $time_now = DateTime->now( time_zone => 'local' );
+	my $can_open_trade = 1;
+	my $dow = $time_now->day_of_week;
+
+	#Dont open trades before 9AM OR at or after 3:00PM
+	if (!$simulation && ($time_now->hour < 9 || $time_now->hour >= 15)) {
+		$can_open_trade = 0;
+	}
+
+	return $can_open_trade;
+}
 
 #Main Starts Here
 STDOUT->autoflush(1);
@@ -96,11 +108,11 @@ my %time_of_last_price;
 my %date_of_last_price;
 my $lot_size_in_cash = 300000;
 my $trade_commission = 200;
-my $stop_loss_percentage = 1.00;
-my $profit_percentage = $stop_loss_percentage*6;
-my $cash_profit_target = 40000;
-my $low_threshold = 0.25;
-my $high_threshold = 0.25;
+my $stop_loss_percentage = 0.25;
+my $profit_percentage = $stop_loss_percentage*2;
+my $cash_profit_target = 20000;
+my $low_threshold = 0.50;
+my $high_threshold = 0.50;
 my $profit_dec_rate_per = 0.005;
 
 while ($repeat_always) {
@@ -216,8 +228,8 @@ while ($repeat_always) {
 			#Buy/Sell Algo
 			#	Buy: When you find a Non-zero low_change with high_volumes
 			#	Sell: When you find a Non-zero high_change with high_volumes
-			if ((defined $last_row[$STOCK_HIGH_VOL]) and ($last_row[$STOCK_HIGH_VOL] == 1)
-				and ($last_row[$STOCK_LO_CNG] != 0 or $last_row[$STOCK_HI_CNG] != 0)) {
+			if ((defined $last_row[$STOCK_HIGH_VOL]) and ($last_row[$STOCK_HIGH_VOL] == 1) and
+				($last_row[$STOCK_LO_CNG] != 0 or $last_row[$STOCK_HI_CNG] != 0) and can_open_trade_time()) {
 				my $recommendation;
 
 				my $stop_loss_price = 0.0;
@@ -228,18 +240,14 @@ while ($repeat_always) {
 				#It is possible to see this since we sample twice.
 				if ((!defined $close_trade_exit_time{$stock_name} or ($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
 				    ($last_row[$STOCK_HI_CNG] != 0) and ($stock_price > ($last_row[$STOCK_HIGH]*(1-$high_threshold/100)))) {
-					$recommendation = "Buy";
-					$profit_price = sprintf("%.2f",$stock_price*(1+$profit_percentage/100));
-					$stop_loss_price = sprintf("%.2f",$stock_price*(1-$stop_loss_percentage/100));
+					$recommendation = "Short_Sell";
 					$trade_trigerred = 1;
 				} else {
 					#Dont enter if we closed the position just in the last bar,
 					#It is possible to see this since we sample twice.
 					if ((!defined $close_trade_exit_time{$stock_name} or ($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
 					    ($last_row[$STOCK_LO_CNG] != 0) and ($stock_price < ($last_row[$STOCK_LOW]*(1+$low_threshold/100)))) {
-						$recommendation = "Short_Sell";
-						$profit_price = sprintf("%.2f",$stock_price*(1-$profit_percentage/100));
-						$stop_loss_price = sprintf("%.2f",$stock_price*(1+$stop_loss_percentage/100));
+						$recommendation = "Buy";
 						$trade_trigerred = 1;
 					}
 				}
@@ -248,6 +256,14 @@ while ($repeat_always) {
 					my $report_simulation = "";
 					if ($simulation) {
 						$report_simulation = "[Simulation Ignore]";
+					}
+
+					if ($recommendation eq "Buy") {
+						$profit_price = sprintf("%.2f",$stock_price*(1+$profit_percentage/100));
+						$stop_loss_price = sprintf("%.2f",$stock_price*(1-$stop_loss_percentage/100));
+					} else {
+						$profit_price = sprintf("%.2f",$stock_price*(1-$profit_percentage/100));
+						$stop_loss_price = sprintf("%.2f",$stock_price*(1+$stop_loss_percentage/100));
 					}
 
 					#Check with current open trades, if its same direction then ignore.
@@ -276,7 +292,7 @@ while ($repeat_always) {
 										VALUES ($insert_id, '$stock_name', '$date_of_last_price{$stock_name}', '$time_of_last_price{$stock_name}', $stock_price, '$recommendation', $profit_price, $stop_loss_price, -200.0, -200.0, 'OPEN', $stock_price, '$time_of_last_price{$stock_name}'));
 							my $rv = $dbh->do($insert_stmt) or warn print "$insert_stmt\n";
 						} else {
-							#Close the old trade, and and new trade.
+							#Close the old trade, and open new trade.
 							my $profit_loss = 0.0;
 							my $stop_profit = 0.0;
 							my $quantity = floor($lot_size_in_cash/$open_trade_entry_price{$stock_name});
