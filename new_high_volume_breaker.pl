@@ -86,7 +86,7 @@ my $userid = "";
 my $password = "";
 
 my $repeat_always = 1;
-my $delay_in_seconds = $simulation == 1? 7: 30;
+my $delay_in_seconds = $simulation == 1? 7: 60;
 
 my $email_program = "mutt";
 
@@ -108,11 +108,13 @@ my %time_of_last_price;
 my %date_of_last_price;
 my $lot_size_in_cash = 300000;
 my $trade_commission = 200;
-my $stop_loss_percentage = 0.25;
-my $profit_percentage = $stop_loss_percentage*2;
-my $cash_profit_target = 20000;
-my $low_threshold = 0.50;
-my $high_threshold = 0.50;
+my $stop_loss_percentage = 0.50;
+my $profit_percentage = $stop_loss_percentage*4;
+my $cash_profit_target = 15000;
+my $low_threshold = 0.20;
+my $high_threshold = 0.20;
+my $buy_change_threshold = -2.00;
+my $sell_change_threshold = 3.00;
 my $profit_dec_rate_per = 0.005;
 
 while ($repeat_always) {
@@ -159,7 +161,7 @@ while ($repeat_always) {
 		my %open_trade_high;
 
 		#Just want to create a scope for local variables.
-		if (1) {
+		{
 			my $high_vol_db = "high_volume_calls.db";
 			my $dsn = "DBI:$driver:dbname=$high_vol_db";
 			my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
@@ -188,7 +190,7 @@ while ($repeat_always) {
 		my %close_trade_exit_time;
 
 		#Just want to create a scope for local variables.
-		if (1) {
+		{
 			my $high_vol_db = "high_volume_calls.db";
 			my $dsn = "DBI:$driver:dbname=$high_vol_db";
 			my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
@@ -215,21 +217,27 @@ while ($repeat_always) {
 			my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
 					      or die $DBI::errstr;
 
-			my $stmt = qq(SELECT * FROM $stock_name WHERE ID=\(SELECT MAX(ID) FROM $stock_name\));
+			#my $stmt = qq(SELECT * FROM $stock_name WHERE ID=\(SELECT MAX(ID) FROM $stock_name\));
+			my $stmt = qq(SELECT * FROM $stock_name LIMIT 2 OFFSET \(SELECT COUNT(*) FROM $stock_name\)-2);
 
 			$sth = $dbh->prepare($stmt)
 				or die "Couldn't prepare statement: " . $dbh->errstr;
 			$sth->execute();
+			my @lastb1_row = $sth->fetchrow_array();
 			my @last_row = $sth->fetchrow_array();
 			$sth->finish();
 			$dbh->disconnect();
 		
 			#This is high_volume == 1, if trade triggered.
 			#Buy/Sell Algo
-			#	Buy: When you find a Non-zero low_change with high_volumes
-			#	Sell: When you find a Non-zero high_change with high_volumes
-			if ((defined $last_row[$STOCK_HIGH_VOL]) and ($last_row[$STOCK_HIGH_VOL] == 1) and
-				($last_row[$STOCK_LO_CNG] != 0 or $last_row[$STOCK_HI_CNG] != 0) and can_open_trade_time()) {
+			#	Buy: When you find a Non-zero low_change and %change < n%  with high_volumes
+			#	Buy: When you find a Non-zero high_change and %change > n%  with high_volumes
+			#	Sell: When you find a Non-zero high_change and %change > n% with high_volumes
+			#	Sell: When you find a Non-zero low_change and %change < n% with high_volumes
+			if ((defined $last_row[$STOCK_HIGH_VOL]) and (defined $lastb1_row[$STOCK_HIGH_VOL]) and
+				($lastb1_row[$STOCK_HIGH_VOL] == 1) and ($last_row[$STOCK_HIGH_VOL] != 1) and
+				($lastb1_row[$STOCK_LO_CNG] != 0 or $lastb1_row[$STOCK_HI_CNG] != 0) and
+				can_open_trade_time()) {
 				my $recommendation;
 
 				my $stop_loss_price = 0.0;
@@ -238,16 +246,32 @@ while ($repeat_always) {
 				my $trade_trigerred = 0;
 				#Dont enter if we closed the position just in the last bar,
 				#It is possible to see this since we sample twice.
-				if ((!defined $close_trade_exit_time{$stock_name} or ($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
-				    ($last_row[$STOCK_HI_CNG] != 0) and ($stock_price > ($last_row[$STOCK_HIGH]*(1-$high_threshold/100)))) {
-					$recommendation = "Short_Sell";
+				if ((!defined $close_trade_exit_time{$stock_name} or
+				     ($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
+				    ($lastb1_row[$STOCK_HI_CNG] != 0) and
+				    ($lastb1_row[$STOCK_LAST] > ($lastb1_row[$STOCK_HIGH]*(1-$high_threshold/100))) and
+				    ($stock_price < $lastb1_row[$STOCK_LAST])) {
+					if (($last_row[$STOCK_HI_CNG] != 0) or ($last_row[$STOCK_PERCNG] > $sell_change_threshold)) {
+						$recommendation = "Short_Sell";
+					} else {
+						$recommendation = "Buy";
+					}
+
 					$trade_trigerred = 1;
 				} else {
 					#Dont enter if we closed the position just in the last bar,
 					#It is possible to see this since we sample twice.
-					if ((!defined $close_trade_exit_time{$stock_name} or ($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
-					    ($last_row[$STOCK_LO_CNG] != 0) and ($stock_price < ($last_row[$STOCK_LOW]*(1+$low_threshold/100)))) {
-						$recommendation = "Buy";
+					if ((!defined $close_trade_exit_time{$stock_name} or
+					     ($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
+					    ($lastb1_row[$STOCK_LO_CNG] != 0) and
+					    ($lastb1_row[$STOCK_LAST] < ($lastb1_row[$STOCK_LOW]*(1+$low_threshold/100))) and
+					    ($stock_price > $lastb1_row[$STOCK_LAST])) {
+						if (($last_row[$STOCK_LO_CNG] != 0) or ($last_row[$STOCK_PERCNG] < $buy_change_threshold)) {
+							$recommendation = "Buy";
+						} else {
+							$recommendation = "Short_Sell";
+						}
+
 						$trade_trigerred = 1;
 					}
 				}

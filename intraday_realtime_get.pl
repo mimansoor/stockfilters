@@ -21,6 +21,23 @@ while (my $row = <$fh>) {
 
 close $fh;
 
+my @url;
+$url[0] = qq(https://www.google.com/finance/info?infotype=infoquoteall&q=);
+for(my $i=0; $i < 100; $i++) {
+	my $row = $mystocks[$i];
+	$url[0] .= qq(NSE:$row,);
+}
+$url[0] =~ s/,$//g;
+
+$url[1] = qq(https://www.google.com/finance/info?infotype=infoquoteall&q=);
+for(my $i=100; $i < 200; $i++) {
+	my $row = $mystocks[$i];
+	$url[1] .= qq(NSE:$row,);
+}
+$url[1] =~ s/,$//g;
+
+my $toggle_url = 0;
+
 sub check_for_download_time {
 	my $time_now = DateTime->now( time_zone => 'local' );
 	my $download = 1;
@@ -71,15 +88,10 @@ while ($repeat_always) {
 		my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
 				      or die $DBI::errstr;
 		my $ua = LWP::Curl->new;
+		my $tmp_url = $url[$toggle_url];
+		$toggle_url = ($toggle_url+1) % 2;
 
-		my @shuffled_company = shuffle @mystocks;
-		my $url = qq(https://www.google.com/finance/info?infotype=infoquoteall&q=);
-		foreach my $row (@shuffled_company) {
-			$url .= qq(NSE:$row,);
-		}
-		$url =~ s/,$//g;
-
-		my $json_str = $ua->get($url);
+		my $json_str = $ua->get($tmp_url);
 		if (defined $json_str)
 		{
 			$json_str =~ s/\/\///;
@@ -140,11 +152,15 @@ while ($repeat_always) {
 				}
 			}
 		} else {
-			warn "Could not open $url\n";
+			warn "Could not open $tmp_url\n";
 		}
 
 		$dbh->disconnect();
-		system("cp tmp_abcdefgh.db 01realtime_data.db");
+
+		#Once we have completed all 200 then only copy
+		if ($toggle_url == 0) {
+			system("cp tmp_abcdefgh.db 01realtime_data.db");
+		}
 	}
 
 to_sleep:
