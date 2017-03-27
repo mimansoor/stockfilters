@@ -4,12 +4,13 @@ use lib qw( ..);
 use DBI;
 use DateTime qw(:all);
 use POSIX;
+use Time::HiRes qw(gettimeofday);
 
 use strict;
 use warnings;
 
-my $simulation = 1;
-my $send_email = 0;
+my $simulation = 0;
+my $send_email = 1;
 
 #View filed indexes
 my $STOCK_ID 		= 0;
@@ -72,9 +73,17 @@ sub can_open_trade_time {
 	my $second = $3;
 	my $can_open_trade = 1;
 
-	#Dont open trades before 9AM OR at or after 3:00PM
-	if ($hour < 9 or $hour >= 15) {
-		$can_open_trade = 0;
+	#Dont open trades before 9:15AM OR at or after 2:45PM
+	if ($hour <= 9 or $hour >= 14) {
+		if(($hour == 9) && ($minute > 15) {
+			$can_open_trade = 1;
+		} else {
+			if (($hour == 14) && ($minute < 45)) {
+				$can_open_trade = 1;
+			} else {
+				$can_open_trade = 0;
+			}
+		}
 	}
 
 	return $can_open_trade;
@@ -105,7 +114,6 @@ sub can_close_trade_time {
 	return $can_close_trade;
 }
 
-
 #Main Starts Here
 STDOUT->autoflush(1);
 
@@ -116,7 +124,7 @@ my $userid = "";
 my $password = "";
 
 my $repeat_always = 1;
-my $delay_in_seconds = $simulation == 1? 3: 60;
+my $delay_in_seconds = $simulation == 1? 7: 60;
 
 my $email_program = "mutt";
 
@@ -140,18 +148,18 @@ my $lot_size_in_cash = 300000;
 my $trade_commission = 200;
 my $stop_loss_percentage = 1.00;
 my $profit_percentage = $stop_loss_percentage*4;
-my $cash_profit_target = 6000;
-my $low_threshold = 0.10;
-my $high_threshold = 0.10;
+my $cash_profit_target = 5000;
+my $low_threshold = 0.1;
+my $high_threshold = 0.1;
 my $buy_change_threshold = -3.00;
-my $sell_change_threshold = 3.00;
-my $profit_dec_rate_per = 0.005;
+my $sell_change_threshold = 4.00;
+my $profit_dec_rate_per = 0.008;
 
 while ($repeat_always) {
-	my $start_time = time();
+	my ($start_time, $utime) = gettimeofday();
 
 	#Get some unique id value
-	my $insert_id = $start_time*1000;
+	my $insert_id = $start_time*1000+$utime%200;
 
 	if (check_for_download_time()) {
 		if ($simulation) {
@@ -269,7 +277,7 @@ while ($repeat_always) {
 			#	Sell: When you find a Non-zero high_change and %change > n% with high_volumes
 			#	Sell: When you find a Non-zero low_change and %change < n% with high_volumes
 			if ((defined $last_row[$STOCK_HIGH_VOL]) and (defined $lastb1_row[$STOCK_HIGH_VOL]) and
-			 	($lastb1_row[$STOCK_HIGH_VOL] == 1) and ($last_row[$STOCK_HIGH_VOL] != 1) and
+				($lastb1_row[$STOCK_HIGH_VOL] == 1) and
 				($lastb1_row[$STOCK_LO_CNG] != 0 or $lastb1_row[$STOCK_HI_CNG] != 0) and
 				can_open_trade_time($last_row[$STOCK_TIME])) {
 				my $recommendation;
