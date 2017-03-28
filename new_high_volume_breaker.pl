@@ -75,7 +75,7 @@ sub can_open_trade_time {
 
 	#Dont open trades before 9:15AM OR at or after 2:45PM
 	if ($hour <= 9 or $hour >= 14) {
-		if(($hour == 9) && ($minute > 15) {
+		if(($hour == 9) && ($minute > 15)) {
 			$can_open_trade = 1;
 		} else {
 			if (($hour == 14) && ($minute < 45)) {
