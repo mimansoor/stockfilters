@@ -10,7 +10,7 @@ use strict;
 use warnings;
 
 my $simulation = 0;
-my $send_email = 1;
+my $send_email = 0;
 
 #View filed indexes
 my $STOCK_ID 		= 0;
@@ -118,7 +118,7 @@ sub can_close_trade_time {
 STDOUT->autoflush(1);
 
 my $driver   = "SQLite";
-my $database_vol = "check_volume1.db";
+my $database_vol = "check_volume.db";
 my $dsn = "DBI:$driver:dbname=$database_vol";
 my $userid = "";
 my $password = "";
@@ -149,6 +149,7 @@ my $trade_commission = 200;
 my $stop_loss_percentage = 1.00;
 my $profit_percentage = $stop_loss_percentage*4;
 my $cash_profit_target = 5000;
+my $cash_loss_target = -500;
 my $low_threshold = 0.1;
 my $high_threshold = 0.1;
 my $buy_change_threshold = -3.00;
@@ -260,7 +261,7 @@ while ($repeat_always) {
 					      or die $DBI::errstr;
 
 			#my $stmt = qq(SELECT * FROM $stock_name WHERE ID=\(SELECT MAX(ID) FROM $stock_name\));
-			my $stmt = qq(SELECT * FROM $stock_name LIMIT 2 OFFSET \(SELECT COUNT(*) FROM $stock_name\)-2);
+			my $stmt = qq(SELECT * FROM \"$stock_name\" LIMIT 2 OFFSET \(SELECT COUNT(*) FROM \"$stock_name\"\)-2);
 
 			$sth = $dbh->prepare($stmt)
 				or die "Couldn't prepare statement: " . $dbh->errstr;
@@ -471,6 +472,11 @@ while ($repeat_always) {
 
 				#Close position if we met minimum profit.
 				if ($profit_loss > $cash_profit_target) {
+					$trade_status = "CLOSED";
+				}
+
+				#Close position if we met maximum loss.
+				if ($profit_loss < $cash_loss_target) {
 					$trade_status = "CLOSED";
 				}
 

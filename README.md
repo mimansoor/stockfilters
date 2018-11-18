@@ -1,2 +1,2 @@
 # stockfilters
-Create automatic stock alerts, screeners using google finance apis
+Create automatic stock alerts, screeners using nse json
