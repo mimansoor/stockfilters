@@ -80,6 +80,44 @@ while ($repeat_always) {
 				my $date = $1;
 				$date =~ s/,//g;
 				$date =~ s/ /-/g;
+
+				#Create item and push for index.
+				my @index_data = @{ $data->{'latestData'} };
+				my %tmp;
+
+				my $indexName = $index_data[0]->{'indexName'};
+				$indexName =~ s/ /_/g;
+				$tmp{'symbol'} = $indexName;
+
+				my $indexOpen = $index_data[0]->{'open'}; 
+				$indexOpen =~ s/,//;
+				$tmp{'open'} = $indexOpen;
+
+				my $indexHigh = $index_data[0]->{'high'}; 
+				$indexHigh =~ s/,//;
+				$tmp{'high'} = $indexHigh;
+
+				my $indexLow = $index_data[0]->{'low'}; 
+				$indexLow =~ s/,//;
+				$tmp{'low'} = $indexLow;
+
+				my $indexLtp = $index_data[0]->{'ltp'}; 
+				$indexLtp =~ s/,//;
+				$tmp{'ltP'} = $indexLtp;
+
+				my $indexCh = $index_data[0]->{'ch'}; 
+				$indexCh =~ s/,//;
+				$tmp{'ptsC'} = $indexCh;
+
+				$tmp{'previousClose'} = $indexLtp - $indexCh;
+
+				$tmp{'per'} = $index_data[0]->{'per'};
+				$tmp{'trdVol'} = $data->{'trdVolumesum'};
+				$tmp{'wkhi'} = $index_data[0]->{'yHigh'};
+				$tmp{'wklo'} = $index_data[0]->{'yLow'};
+
+				push(@stock_data, \%tmp);
+
 				foreach my $item (@stock_data) {
 					undef $stmt;
 					my $name = $item->{'symbol'};
@@ -113,7 +151,7 @@ while ($repeat_always) {
 					my $stmt = qq(INSERT INTO INTRADAY_DATA (ID,NAME,OPEN,HIGH,LOW,LAST,PREVCLOSE,CHANGE,PERCHANGE,VOLUME,HI52,LO52,TIME,DATE)
 						VALUES ($id, '$name', $open, $high, $low, $last, $prev_close, $change, $change_per, $volume, $hi52, $lo52, '$time', '$date'));
 					#my $rv = $dbh->do($stmt) or warn print $stmt."\n",$DBI::errstr,goto to_sleep;
-					#print $stmt."\n";
+					print $stmt."\n";
 					my $rv = $dbh->do($stmt) or warn print "$stmt\n" and goto to_sleep;
 					$id++;
 				}

@@ -29,6 +29,7 @@ my $STOCK_BAR_LIQDITY 	= 12;
 my $STOCK_HIGH_VOL 	= 13;
 
 sub check_for_download_time {
+	return 1;
 	if ($simulation) {
 		return 1;
 	}
@@ -124,7 +125,7 @@ my $userid = "";
 my $password = "";
 
 my $repeat_always = 1;
-my $delay_in_seconds = $simulation == 1? 7: 60;
+my $delay_in_seconds = $simulation == 1? 7: 10;
 
 my $email_program = "mutt";
 
@@ -144,12 +145,12 @@ my %high_price;
 my %per_change_in_price;
 my %time_of_last_price;
 my %date_of_last_price;
-my $lot_size_in_cash = 300000;
-my $trade_commission = 200;
+my $lot_size_in_cash = 1000000;
+my $trade_commission = 300;
 my $stop_loss_percentage = 1.00;
 my $profit_percentage = $stop_loss_percentage*4;
-my $cash_profit_target = 5000;
-my $cash_loss_target = -500;
+my $cash_profit_target = 4000;
+my $cash_loss_target = -1000;
 my $low_threshold = 0.1;
 my $high_threshold = 0.1;
 my $buy_change_threshold = -3.00;
