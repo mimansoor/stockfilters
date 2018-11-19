@@ -29,7 +29,6 @@ my $STOCK_BAR_LIQDITY 	= 12;
 my $STOCK_HIGH_VOL 	= 13;
 
 sub check_for_download_time {
-	return 1;
 	if ($simulation) {
 		return 1;
 	}
@@ -74,12 +73,12 @@ sub can_open_trade_time {
 	my $second = $3;
 	my $can_open_trade = 1;
 
-	#Dont open trades before 9:15AM OR at or after 2:45PM
+	#Dont open trades before 9:30AM OR at or after 2:45PM
 	if ($hour <= 9 or $hour >= 14) {
-		if(($hour == 9) && ($minute > 15)) {
+		if(($hour == 9) && ($minute >= 30)) {
 			$can_open_trade = 1;
 		} else {
-			if (($hour == 14) && ($minute < 45)) {
+			if (($hour == 14) && ($minute <= 45)) {
 				$can_open_trade = 1;
 			} else {
 				$can_open_trade = 0;
@@ -99,14 +98,14 @@ sub can_close_trade_time {
 	my $second = $3;
 	my $can_close_trade = 0;
 
-	#Close trades before 9:15AM or after 3:15PM
+	#Close trades before 9:30AM or after 3:15PM
 	if ($hour <= 9 or $hour >= 15) {
 		if ($hour <= 9) {
-			if ($minute <= 15) {
+			if ($minute < 30) {
 				$can_close_trade = 1;
 			}
 		} else {
-			if ($minute >= 15) {
+			if ($minute > 15) {
 				$can_close_trade = 1;
 			}
 		}
@@ -125,7 +124,7 @@ my $userid = "";
 my $password = "";
 
 my $repeat_always = 1;
-my $delay_in_seconds = $simulation == 1? 7: 10;
+my $delay_in_seconds = $simulation == 1? 7: 25;
 
 my $email_program = "mutt";
 
@@ -149,8 +148,8 @@ my $lot_size_in_cash = 1000000;
 my $trade_commission = 300;
 my $stop_loss_percentage = 1.00;
 my $profit_percentage = $stop_loss_percentage*4;
-my $cash_profit_target = 4000;
-my $cash_loss_target = -1000;
+my $cash_profit_target = 50000;
+my $cash_loss_target = -50000;
 my $low_threshold = 0.1;
 my $high_threshold = 0.1;
 my $buy_change_threshold = -3.00;

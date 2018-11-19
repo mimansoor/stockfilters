@@ -14,7 +14,6 @@ $url[2] = qq(https://nseindia.com/live_market/dynaContent/live_watch/stock_watch
 my $toggle_url = 0;
 
 sub check_for_download_time {
-	return 1;
 	my $time_now = DateTime->now( time_zone => 'local' );
 	my $download = 1;
 	my $dow = $time_now->day_of_week;
@@ -26,7 +25,7 @@ sub check_for_download_time {
 	} else {
 		#On Week Day's ie., Monday to Friday
 		#Start only after 9:17AM
-		#Stop after 15:31PM
+		#Stop after 15:32PM
 		if ($time_now->hour < 9 || $time_now->hour > 15) {
 			$download = 0;
 		} else {
@@ -36,7 +35,7 @@ sub check_for_download_time {
 				}
 			} else {
 				if ($time_now->hour == 15) {
-					if ($time_now->minute > 31) {
+					if ($time_now->minute > 32) {
 						$download = 0;
 					}
 				}
@@ -171,7 +170,7 @@ while ($repeat_always) {
 to_sleep:
 	my $end_time = time();
 	my $work_time = ($end_time - $start_time);
-	my $delay_in_seconds = 10;
+	my $delay_in_seconds = 40;
 
 	#To ensure alignment with actual clock if drift
 	#in seconds is > delay/2 (seconds)
