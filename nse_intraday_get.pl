@@ -8,9 +8,12 @@ use DateTime qw(:all);
 use List::Util qw(shuffle);
 
 my @url;
+my @prev_time;
 $url[0] = qq(https://nseindia.com/live_market/dynaContent/live_watch/stock_watch/niftyStockWatch.json);
 $url[1] = qq(https://nseindia.com/live_market/dynaContent/live_watch/stock_watch/juniorNiftyStockWatch.json);
 $url[2] = qq(https://nseindia.com/live_market/dynaContent/live_watch/stock_watch/niftyMidcap50StockWatch.json);
+
+my $URL_SIZE = 3;
 my $toggle_url = 0;
 
 sub check_for_download_time {
@@ -25,7 +28,7 @@ sub check_for_download_time {
 	} else {
 		#On Week Day's ie., Monday to Friday
 		#Start only after 9:17AM
-		#Stop after 15:32PM
+		#Stop after 15:33PM
 		if ($time_now->hour < 9 || $time_now->hour > 15) {
 			$download = 0;
 		} else {
@@ -35,7 +38,7 @@ sub check_for_download_time {
 				}
 			} else {
 				if ($time_now->hour == 15) {
-					if ($time_now->minute > 32) {
+					if ($time_now->minute > 33) {
 						$download = 0;
 					}
 				}
@@ -56,14 +59,16 @@ my $password = "";
 
 $repeat_always = 1;
 
+my $same_time_received;
+
 while ($repeat_always) {
 	my $start_time = time();
+	$same_time_received = 0;
 	if (check_for_download_time()) {
 		$id = $start_time*1000;
 		my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
 				      or die $DBI::errstr;
 		my $tmp_url = $url[$toggle_url];
-		$toggle_url = ($toggle_url+1) % 3;
 
 		my $json_str = LWP::Simple::get($tmp_url);
 		if (defined $json_str)
@@ -76,83 +81,93 @@ while ($repeat_always) {
 				my $time = $data->{'time'};
 				$time =~ /(.*) (..:..:..)/;
 				$time = $2;
-				my $date = $1;
-				$date =~ s/,//g;
-				$date =~ s/ /-/g;
 
-				#Create item and push for index.
-				my @index_data = @{ $data->{'latestData'} };
-				my %tmp;
+				#Dont store if the time is same from previous stored time.
+				$same_time_received = 1;
+				if ($prev_time[$toggle_url] ne $time) {
+					my $date = $1;
+					$date =~ s/,//g;
+					$date =~ s/ /-/g;
 
-				my $indexName = $index_data[0]->{'indexName'};
-				$indexName =~ s/ /_/g;
-				$tmp{'symbol'} = $indexName;
+					$prev_time[$toggle_url] = $time;
 
-				my $indexOpen = $index_data[0]->{'open'}; 
-				$indexOpen =~ s/,//;
-				$tmp{'open'} = $indexOpen;
+					#Create item and push for index.
+					my @index_data = @{ $data->{'latestData'} };
+					my %tmp;
 
-				my $indexHigh = $index_data[0]->{'high'}; 
-				$indexHigh =~ s/,//;
-				$tmp{'high'} = $indexHigh;
+					my $indexName = $index_data[0]->{'indexName'};
+					$indexName =~ s/ /_/g;
+					$tmp{'symbol'} = $indexName;
 
-				my $indexLow = $index_data[0]->{'low'}; 
-				$indexLow =~ s/,//;
-				$tmp{'low'} = $indexLow;
+					my $indexOpen = $index_data[0]->{'open'};
+					$indexOpen =~ s/,//;
+					$tmp{'open'} = $indexOpen;
 
-				my $indexLtp = $index_data[0]->{'ltp'}; 
-				$indexLtp =~ s/,//;
-				$tmp{'ltP'} = $indexLtp;
+					my $indexHigh = $index_data[0]->{'high'};
+					$indexHigh =~ s/,//;
+					$tmp{'high'} = $indexHigh;
 
-				my $indexCh = $index_data[0]->{'ch'}; 
-				$indexCh =~ s/,//;
-				$tmp{'ptsC'} = $indexCh;
+					my $indexLow = $index_data[0]->{'low'};
+					$indexLow =~ s/,//;
+					$tmp{'low'} = $indexLow;
 
-				$tmp{'previousClose'} = $indexLtp - $indexCh;
+					my $indexLtp = $index_data[0]->{'ltp'};
+					$indexLtp =~ s/,//;
+					$tmp{'ltP'} = $indexLtp;
 
-				$tmp{'per'} = $index_data[0]->{'per'};
-				$tmp{'trdVol'} = $data->{'trdVolumesum'};
-				$tmp{'wkhi'} = $index_data[0]->{'yHigh'};
-				$tmp{'wklo'} = $index_data[0]->{'yLow'};
+					my $indexCh = $index_data[0]->{'ch'};
+					$indexCh =~ s/,//;
+					$tmp{'ptsC'} = $indexCh;
 
-				push(@stock_data, \%tmp);
+					$tmp{'previousClose'} = $indexLtp - $indexCh;
 
-				foreach my $item (@stock_data) {
-					undef $stmt;
-					my $name = $item->{'symbol'};
-					$name =~ s/,//;
-					my $open = $item->{'open'};
-					$open =~ s/,//;
-					my $high = $item->{'high'};
-					$high =~ s/,//;
-					my $low  = $item->{'low'};
-					$low =~ s/,//;
-					my $last = $item->{'ltP'};
-					$last =~ s/,//;
-					my $prev_close = $item->{'previousClose'};
-					$prev_close =~ s/,//;
-					my $change = $item->{'ptsC'};
-					$change =~ s/,//;
-					my $change_per = $item->{'per'};
-					$change_per =~ s/,//;
-					my $volume = $item->{'trdVol'};
-					$volume =~ s/,//;
-					$volume = $volume * 100000; #Convert from Lacs
-					my $hi52 = $item->{'wkhi'};
-					$hi52 =~ s/,//;
-					my $lo52 = $item->{'wklo'};
-					$lo52 =~ s/,//;
+					$tmp{'per'} = $index_data[0]->{'per'};
+					$tmp{'trdVol'} = $data->{'trdVolumesum'};
+					$tmp{'wkhi'} = $index_data[0]->{'yHigh'};
+					$tmp{'wklo'} = $index_data[0]->{'yLow'};
 
-					$open = $open eq "" ? 0 : $open;
-					$high = $high eq "" ? 0 : $high;
-					$low = $low eq "" ? 0 : $low;
-					$last = $last eq "" ? 0 : $last;
-					my $stmt = qq(INSERT INTO INTRADAY_DATA (ID,NAME,OPEN,HIGH,LOW,LAST,PREVCLOSE,CHANGE,PERCHANGE,VOLUME,HI52,LO52,TIME,DATE)
-						VALUES ($id, '$name', $open, $high, $low, $last, $prev_close, $change, $change_per, $volume, $hi52, $lo52, '$time', '$date'));
-					#my $rv = $dbh->do($stmt) or warn print $stmt."\n",$DBI::errstr,goto to_sleep;
-					print $stmt."\n";
-					my $rv = $dbh->do($stmt) or warn print "$stmt\n" and goto to_sleep;
-					$id++;
+					push(@stock_data, \%tmp);
+
+					foreach my $item (@stock_data) {
+						undef $stmt;
+						my $name = $item->{'symbol'};
+						$name =~ s/,//;
+						my $open = $item->{'open'};
+						$open =~ s/,//;
+						my $high = $item->{'high'};
+						$high =~ s/,//;
+						my $low  = $item->{'low'};
+						$low =~ s/,//;
+						my $last = $item->{'ltP'};
+						$last =~ s/,//;
+						my $prev_close = $item->{'previousClose'};
+						$prev_close =~ s/,//;
+						my $change = $item->{'ptsC'};
+						$change =~ s/,//;
+						my $change_per = $item->{'per'};
+						$change_per =~ s/,//;
+						my $volume = $item->{'trdVol'};
+						$volume =~ s/,//;
+						$volume = $volume * 100000; #Convert from Lacs
+						my $hi52 = $item->{'wkhi'};
+						$hi52 =~ s/,//;
+						my $lo52 = $item->{'wklo'};
+						$lo52 =~ s/,//;
+
+						$open = $open eq "" ? 0 : $open;
+						$high = $high eq "" ? 0 : $high;
+						$low = $low eq "" ? 0 : $low;
+						$last = $last eq "" ? 0 : $last;
+						my $stmt = qq(INSERT INTO INTRADAY_DATA (ID,NAME,OPEN,HIGH,LOW,LAST,PREVCLOSE,CHANGE,PERCHANGE,VOLUME,HI52,LO52,TIME,DATE)
+							VALUES ($id, '$name', $open, $high, $low, $last, $prev_close, $change, $change_per, $volume, $hi52, $lo52, '$time', '$date'));
+						#my $rv = $dbh->do($stmt) or warn print $stmt."\n",$DBI::errstr,goto to_sleep;
+						#print $stmt."\n";
+						my $rv = $dbh->do($stmt) or warn print "$stmt\n" and goto to_sleep;
+						$id++;
+					}
+
+					$toggle_url = ($toggle_url+1) % $URL_SIZE;
+					$same_time_received = 0;
 				}
 			}
 		} else {
@@ -161,29 +176,44 @@ while ($repeat_always) {
 
 		$dbh->disconnect();
 
-		#Once we have completed all 200 then only copy
-		if ($toggle_url == 0) {
+		#Once we have completed all then only copy
+		if ($same_time_received == 0 and $toggle_url == 0) {
 			system("cp tmp_abcdefgh.db 01realtime_data.db");
 		}
+	} else {
+		#make sure you sleep for long time if its not yet time.
+		$toggle_url = 0;
 	}
 
 to_sleep:
 	my $end_time = time();
 	my $work_time = ($end_time - $start_time);
-	my $delay_in_seconds = 40;
+	my $delay_in_seconds;
+	my $sleep_time = 0;
 
-	#To ensure alignment with actual clock if drift
-	#in seconds is > delay/2 (seconds)
-	my $rounding = $end_time % $delay_in_seconds;
-	if ($rounding > $delay_in_seconds/4) {
-		$rounding = $delay_in_seconds - $rounding;
+	#if we received same time try again soon
+	if ($same_time_received == 1) {
+		$delay_in_seconds = 2;
 	} else {
-		$rounding *= -1;
-	}
+		if ($toggle_url == 0) {
+			$delay_in_seconds = 60;
 
-	#Adjust the work time to keep getting every delay(60) seconds
-	#And if required move to the next round minute.
-	my $sleep_time = $delay_in_seconds - $work_time + $rounding;
+			#To ensure alignment with actual clock if drift
+			#in seconds is > delay/2 (seconds)
+			my $rounding = $end_time % $delay_in_seconds;
+			if ($rounding > $delay_in_seconds/4) {
+				$rounding = $delay_in_seconds - $rounding;
+			} else {
+				$rounding *= -1;
+			}
+
+			#Adjust the work time to keep getting every delay(60) seconds
+			#And if required move to the next round minute.
+			$sleep_time = $delay_in_seconds - $work_time + $rounding;
+		} else {
+			$delay_in_seconds = 5;
+		}
+	}
 
 	#If for some reason sleep goes negative,
 	#Sleep at least delay seconds
@@ -191,7 +221,7 @@ to_sleep:
 		$sleep_time = $delay_in_seconds;
 	}
 
-	print "Sleeping for $sleep_time\n";
+	#print "Work time: $work_time Sleeping for: $sleep_time\n";
 
 	sleep $sleep_time;
 }
