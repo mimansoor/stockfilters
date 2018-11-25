@@ -9,14 +9,14 @@ use List::Util qw(shuffle);
 
 my @url;
 my @prev_time;
-$url[0] = qq(https://nseindia.com/live_market/dynaContent/live_watch/stock_watch/niftyStockWatch.json);
-$url[1] = qq(https://nseindia.com/live_market/dynaContent/live_watch/stock_watch/juniorNiftyStockWatch.json);
-$url[2] = qq(https://nseindia.com/live_market/dynaContent/live_watch/stock_watch/niftyMidcap50StockWatch.json);
+$url[0] = qq(https://nseindia.com/live_market/dynaContent/live_watch/stock_watch/foSecStockWatch.json);
+$url[1] = qq(https://nseindia.com/live_market/dynaContent/live_watch/stock_watch/niftyStockWatch.json);
 
-my $URL_SIZE = 3;
+my $URL_SIZE = 2;
 my $toggle_url = 0;
 
 sub check_for_download_time {
+	return 1;
 	my $time_now = DateTime->now( time_zone => 'local' );
 	my $download = 1;
 	my $dow = $time_now->day_of_week;
@@ -77,7 +77,6 @@ while ($repeat_always) {
 
 			$data = decode_json( $json_str );
 			if ($data ne "") {
-				my @stock_data = @{ $data->{'data'} };
 				my $time = $data->{'time'};
 				$time =~ /(.*) (..:..:..)/;
 				$time = $2;
@@ -88,45 +87,50 @@ while ($repeat_always) {
 					my $date = $1;
 					$date =~ s/,//g;
 					$date =~ s/ /-/g;
+					my @stock_data;
 
 					$prev_time[$toggle_url] = $time;
+					
+					if ($data->{'latestData'} ne "") {
+						#Create item and push for index.
+						my @index_data = @{ $data->{'latestData'} };
+						my %tmp;
 
-					#Create item and push for index.
-					my @index_data = @{ $data->{'latestData'} };
-					my %tmp;
+						my $indexName = $index_data[0]->{'indexName'};
+						$indexName =~ s/ /_/g;
+						$tmp{'symbol'} = $indexName;
 
-					my $indexName = $index_data[0]->{'indexName'};
-					$indexName =~ s/ /_/g;
-					$tmp{'symbol'} = $indexName;
+						my $indexOpen = $index_data[0]->{'open'};
+						$indexOpen =~ s/,//;
+						$tmp{'open'} = $indexOpen;
 
-					my $indexOpen = $index_data[0]->{'open'};
-					$indexOpen =~ s/,//;
-					$tmp{'open'} = $indexOpen;
+						my $indexHigh = $index_data[0]->{'high'};
+						$indexHigh =~ s/,//;
+						$tmp{'high'} = $indexHigh;
 
-					my $indexHigh = $index_data[0]->{'high'};
-					$indexHigh =~ s/,//;
-					$tmp{'high'} = $indexHigh;
+						my $indexLow = $index_data[0]->{'low'};
+						$indexLow =~ s/,//;
+						$tmp{'low'} = $indexLow;
 
-					my $indexLow = $index_data[0]->{'low'};
-					$indexLow =~ s/,//;
-					$tmp{'low'} = $indexLow;
+						my $indexLtp = $index_data[0]->{'ltp'};
+						$indexLtp =~ s/,//;
+						$tmp{'ltP'} = $indexLtp;
 
-					my $indexLtp = $index_data[0]->{'ltp'};
-					$indexLtp =~ s/,//;
-					$tmp{'ltP'} = $indexLtp;
+						my $indexCh = $index_data[0]->{'ch'};
+						$indexCh =~ s/,//;
+						$tmp{'ptsC'} = $indexCh;
 
-					my $indexCh = $index_data[0]->{'ch'};
-					$indexCh =~ s/,//;
-					$tmp{'ptsC'} = $indexCh;
+						$tmp{'previousClose'} = $indexLtp - $indexCh;
 
-					$tmp{'previousClose'} = $indexLtp - $indexCh;
+						$tmp{'per'} = $index_data[0]->{'per'};
+						$tmp{'trdVol'} = $data->{'trdVolumesum'};
+						$tmp{'wkhi'} = $index_data[0]->{'yHigh'};
+						$tmp{'wklo'} = $index_data[0]->{'yLow'};
 
-					$tmp{'per'} = $index_data[0]->{'per'};
-					$tmp{'trdVol'} = $data->{'trdVolumesum'};
-					$tmp{'wkhi'} = $index_data[0]->{'yHigh'};
-					$tmp{'wklo'} = $index_data[0]->{'yLow'};
-
-					push(@stock_data, \%tmp);
+						push(@stock_data, \%tmp);
+					} else {
+						@stock_data = @{ $data->{'data'} };
+					}
 
 					foreach my $item (@stock_data) {
 						undef $stmt;
@@ -140,10 +144,14 @@ while ($repeat_always) {
 						$low =~ s/,//;
 						my $last = $item->{'ltP'};
 						$last =~ s/,//;
-						my $prev_close = $item->{'previousClose'};
-						$prev_close =~ s/,//;
 						my $change = $item->{'ptsC'};
 						$change =~ s/,//;
+						my $prev_close = $item->{'previousClose'};
+						if ($prev_close ne "") {
+							$prev_close =~ s/,//;
+						} else {
+							$prev_close = $last - $change;
+						}
 						my $change_per = $item->{'per'};
 						$change_per =~ s/,//;
 						my $volume = $item->{'trdVol'};
@@ -158,8 +166,25 @@ while ($repeat_always) {
 						$high = $high eq "" ? 0 : $high;
 						$low = $low eq "" ? 0 : $low;
 						$last = $last eq "" ? 0 : $last;
-						my $stmt = qq(INSERT INTO INTRADAY_DATA (ID,NAME,OPEN,HIGH,LOW,LAST,PREVCLOSE,CHANGE,PERCHANGE,VOLUME,HI52,LO52,TIME,DATE)
-							VALUES ($id, '$name', $open, $high, $low, $last, $prev_close, $change, $change_per, $volume, $hi52, $lo52, '$time', '$date'));
+
+						$corporate_action = $item->{'cAct'};
+
+						my $dividend = 0;
+						my $ex_date = "";
+						if ($corporate_action ne '-') {
+							$corporate_action =~ /^(.*) ((.*) PER).*/;
+							if ($2 ne "" and $3 ne "") {
+								$dividend = sprintf("%.2f",$3);
+							}
+
+							$ex_date = $item->{'xDt'};
+						}
+
+						my $div_yield = sprintf("%.2f",$dividend/$last * 100.0);
+
+
+						my $stmt = qq(INSERT INTO INTRADAY_DATA (ID,NAME,OPEN,HIGH,LOW,LAST,PREVCLOSE,CHANGE,PERCHANGE,VOLUME,HI52,LO52,TIME,DATE,Corporate_action,DIV_YIELD,DIVIDEND,EX_DATE)
+							VALUES ($id, '$name', $open, $high, $low, $last, $prev_close, $change, $change_per, $volume, $hi52, $lo52, '$time', '$date', '$corporate_action', $div_yield, $dividend,'$ex_date'));
 						#my $rv = $dbh->do($stmt) or warn print $stmt."\n",$DBI::errstr,goto to_sleep;
 						#print $stmt."\n";
 						my $rv = $dbh->do($stmt) or warn print "$stmt\n" and goto to_sleep;
@@ -196,7 +221,7 @@ to_sleep:
 		$delay_in_seconds = 2;
 	} else {
 		if ($toggle_url == 0) {
-			$delay_in_seconds = 60;
+			$delay_in_seconds = 90;
 
 			#To ensure alignment with actual clock if drift
 			#in seconds is > delay/2 (seconds)
