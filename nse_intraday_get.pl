@@ -15,8 +15,22 @@ $url[1] = qq(https://nseindia.com/live_market/dynaContent/live_watch/stock_watch
 my $URL_SIZE = 2;
 my $toggle_url = 0;
 
+my %month;
+
+$month{'JAN'} = 1;
+$month{'FEB'} = 2;
+$month{'MAR'} = 3;
+$month{'APR'} = 4;
+$month{'MAY'} = 5;
+$month{'JUN'} = 6;
+$month{'JUL'} = 7;
+$month{'AUG'} = 8;
+$month{'SEP'} = 9;
+$month{'OCT'} = 10;
+$month{'NOV'} = 11;
+$month{'DEC'} = 12;
+
 sub check_for_download_time {
-	return 1;
 	my $time_now = DateTime->now( time_zone => 'local' );
 	my $download = 1;
 	my $dow = $time_now->day_of_week;
@@ -59,13 +73,17 @@ my $password = "";
 
 $repeat_always = 1;
 
-my $same_time_received;
+my $same_time_received = 0;
+my $start_time;
 
 while ($repeat_always) {
-	my $start_time = time();
+	if ($same_time_received == 0 and $toggle_url == 0) {
+		$start_time = time();
+	}
+
 	$same_time_received = 0;
 	if (check_for_download_time()) {
-		$id = $start_time*1000;
+		$id = time()*1000;
 		my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
 				      or die $DBI::errstr;
 		my $tmp_url = $url[$toggle_url];
@@ -170,14 +188,22 @@ while ($repeat_always) {
 						$corporate_action = $item->{'cAct'};
 
 						my $dividend = 0;
-						my $ex_date = "";
-						if ($corporate_action ne '-') {
+						my $ex_date = 19000101;
+						if ($corporate_action ne '-' and $corporate_action ne '') {
 							$corporate_action =~ /^(.*) ((.*) PER).*/;
 							if ($2 ne "" and $3 ne "") {
 								$dividend = sprintf("%.2f",$3);
 							}
 
 							$ex_date = $item->{'xDt'};
+
+							$ex_date =~ /(.*)-(.*)-(.*)/;
+							my $day = $1;
+							my $mon = $2;
+							$mon = $month{$mon};
+							my $year = $3;
+
+							$ex_date = sprintf("%04d%02d%02d",$year,$mon,$day);
 						}
 
 						my $div_yield = sprintf("%.2f",$dividend/$last * 100.0);
@@ -211,17 +237,18 @@ while ($repeat_always) {
 	}
 
 to_sleep:
-	my $end_time = time();
-	my $work_time = ($end_time - $start_time);
-	my $delay_in_seconds;
+	my $delay_in_seconds = 0;
 	my $sleep_time = 0;
+	my $work_time = 0;
 
 	#if we received same time try again soon
 	if ($same_time_received == 1) {
-		$delay_in_seconds = 2;
+		$delay_in_seconds = 30;
 	} else {
 		if ($toggle_url == 0) {
-			$delay_in_seconds = 90;
+			my $end_time = time();
+			$work_time = ($end_time - $start_time);
+			$delay_in_seconds = 120;
 
 			#To ensure alignment with actual clock if drift
 			#in seconds is > delay/2 (seconds)
@@ -236,7 +263,7 @@ to_sleep:
 			#And if required move to the next round minute.
 			$sleep_time = $delay_in_seconds - $work_time + $rounding;
 		} else {
-			$delay_in_seconds = 5;
+			$delay_in_seconds = 2;
 		}
 	}
 
