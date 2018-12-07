@@ -9,8 +9,8 @@ use Time::HiRes qw(gettimeofday);
 use strict;
 use warnings;
 
-my $simulation = 0;
-my $send_email = 1;
+my $simulation = 1;
+my $send_email = 0;
 my $email_list = "mimansoor\@gmail.com, lksingh74\@gmail.com, prathibha.chirag\@gmail.com";
 
 #View filed indexes
@@ -137,7 +137,7 @@ sub load_fno_market_lot {
 		my $symbol = $tokens[$FO_SYMBOL];
 
 		#skip line that has Symbol as symbol name
-		if ($symbol eq 'Symbol') {
+                if ($symbol eq 'Symbol') {
 			next;
 		}
 
@@ -147,6 +147,8 @@ sub load_fno_market_lot {
 
 		$fno_market_lot{$symbol} = $tokens[$FO_NEAR_MONTH_LOT_SIZE];
 	}
+
+	close(FILE);
 }
 
 #Main Starts Here
@@ -181,17 +183,17 @@ my %time_of_last_price;
 my %date_of_last_price;
 my $lot_size_in_cash = 825000;
 my $trade_commission = 250;
-my $stop_loss_percentage = 0.60;
-my $profit_percentage = $stop_loss_percentage*1.25;
-my $cash_profit_target = 2000;
-my $cash_loss_target = -50000;
+my $stop_loss_percentage = 0.70;
+my $profit_percentage = $stop_loss_percentage*1.5;
+my $cash_profit_target = 10000;
+my $cash_loss_target = -1000;
 my $low_threshold = 0.1;
 my $high_threshold = 0.1;
 my $buy_change_threshold = -20.00;
 my $sell_change_threshold = 20.00;
 my $profit_dec_rate_per = 0.008;
-my $buy_per_threshold = 7.0;
-my $sell_per_threshold = -7.0;
+my $buy_per_threshold = 5.0;
+my $sell_per_threshold = -5.0;
 
 #After making 1 : 1 profit take atleast some money home
 my $take_home_threshold = $stop_loss_percentage;
@@ -347,7 +349,11 @@ while ($repeat_always) {
 						$recommendation = "Short_Sell";
 					} else {
 						#printf("$last_row[$STOP_AT_PARTIAL] $sell_change_threshold :Going Long\n");
-						$recommendation = "Buy";
+						if ($stock_name eq "NIFTY_50") {
+							$recommendation = "Buy";
+						} else {
+							$recommendation = "Short_Sell";
+						}
 					}
 
 					$trade_trigerred = 1;
@@ -364,7 +370,11 @@ while ($repeat_always) {
 							$recommendation = "Buy";
 						} else {
 							#printf("$last_row[$STOCK_PERCNG] $buy_change_threshold :Going Short\n");
-							$recommendation = "Short_Sell";
+							if ($stock_name eq "NIFTY_50") {
+								$recommendation = "Short_Sell";
+							} else {
+								$recommendation = "Buy";
+							}
 						}
 
 						$trade_trigerred = 1;
@@ -393,12 +403,6 @@ while ($repeat_always) {
 							$new_trade = 1;
 						}
 
-						#If its not a new trade then its Cover and Reverse.
-						my $email_recommendation = $new_trade == 1 ? $recommendation : "Cover Old And $recommendation";
-
-						my $email_cmd = qq(-s "Fourways Profit: $report_simulation $time_of_last_price{$stock_name}: $email_recommendation $stock_name \($stock_price\) Target: $profit_price StopLoss: $stop_loss_price" $email_list < /dev/null);
-						my $email_sent = $send_email == 1? system("$email_program $email_cmd") : 0;
-
 						#Now store it in a DB with Buy, take profit and stop loss values
 						my $database = "high_volume_calls.db";
 						my $dsn = "DBI:$driver:dbname=$database";
@@ -407,6 +411,11 @@ while ($repeat_always) {
 
 						#If New Trade just Insert Row
 						if ($new_trade) {
+							#Send email notifications if enabled
+							my $email_recommendation = $recommendation;
+							my $email_cmd = qq(-s "Fourways Profit: $report_simulation $time_of_last_price{$stock_name}: $email_recommendation $stock_name \($stock_price\) Target: $profit_price StopLoss: $stop_loss_price" $email_list < /dev/null);
+							my $email_sent = $send_email == 1? system("$email_program $email_cmd") : 0;
+
 							my $insert_stmt = qq(INSERT INTO high_volume_calls_v2 (ID, NAME, DATE, ENTRY_TIME, ENTRY_PRICE, TRADE_TYPE, PROFIT_PRICE, STOP_LOSS_PRICE, STOP_PROFIT, PROFIT_LOSS, TRADE_STATUS, CURRENT_PRICE, EXIT_TIME, MAX_PROFIT, MAX_LOSS, QUANTITY)
 										VALUES ($insert_id, '$stock_name', '$date_of_last_price{$stock_name}', '$time_of_last_price{$stock_name}', $stock_price, '$recommendation', $profit_price, $stop_loss_price, ($trade_commission*-1.0), ($trade_commission*-1.0), 'OPEN', $stock_price, '$time_of_last_price{$stock_name}', ($trade_commission*-1.0), ($trade_commission*-1.0), $quantity));
 							my $rv = $dbh->do($insert_stmt) or warn print "$insert_stmt\n";
@@ -445,12 +454,30 @@ while ($repeat_always) {
 								$max_loss = $profit_loss;
 							}
 
+							my $profit_target = $open_trade_profit_price{$stock_name};
+							my $stop_loss = $open_trade_stop_loss_price{$stock_name};
+							my $profit_target_u = sprintf("%.02f", (int($profit_target*100)-(($profit_target*100)%5))/100.0);
+							my $stop_profit_u = sprintf("%.02f", (int($stop_profit*100)-(($stop_profit*100)%5))/100.0);
+							my $profit_loss_u = sprintf("%.02f", (int($profit_loss*100)-(($profit_loss*100)%5))/100.0);
+							my $stop_loss_u = sprintf("%.02f", (int($stop_loss*100)-(($stop_loss*100)%5))/100.0);
+
+							#If its not a new trade then its Cover and Reverse.
+							#Close the Old trade
+							my $email_recommendation = "CLOSED";
+							my $email_cmd = qq(-s "Fourways Profit: $report_simulation $time_of_last_price{$stock_name}: $email_recommendation $stock_name \($stock_price\) Porfit: $profit_loss_u Max_Drawdown: $max_loss Max_Profit: $max_profit" $email_list < /dev/null);
+							my $email_sent = $send_email == 1? system("$email_program $email_cmd") : 0;
+
 							my $update_stmt = qq(UPDATE high_volume_calls_v2 set TRADE_STATUS = 'CLOSED',
-									 CURRENT_PRICE = $stock_price, STOP_PROFIT = $stop_profit,
-									 PROFIT_LOSS = $profit_loss, MAX_PROFIT = $max_profit, MAX_LOSS = $max_loss,
+									 CURRENT_PRICE = $closing_price, PROFIT_PRICE = $profit_target_u,
+									 STOP_LOSS_PRICE = $stop_loss_u, STOP_PROFIT = $stop_profit_u,
+									 PROFIT_LOSS = $profit_loss_u, MAX_PROFIT = $max_profit, MAX_LOSS = $max_loss,
 									 EXIT_TIME = '$time_of_last_price{$stock_name}' WHERE ID == $open_trade_id{$stock_name};);
 							my $my_ledger_rv = $dbh->do($update_stmt) or die $DBI::errstr;
 
+							#Now Open new position
+							$email_recommendation = $recommendation;
+							$email_cmd = qq(-s "Fourways Profit: $report_simulation $time_of_last_price{$stock_name}: $email_recommendation $stock_name \($stock_price\) Target: $profit_price StopLoss: $stop_loss_price" $email_list < /dev/null);
+							$email_sent = $send_email == 1? system("$email_program $email_cmd") : 0;
 							#Now add the new record
 							my $insert_stmt = qq(INSERT INTO high_volume_calls_v2 (ID, NAME, DATE, ENTRY_TIME, ENTRY_PRICE, TRADE_TYPE, PROFIT_PRICE, STOP_LOSS_PRICE, STOP_PROFIT, PROFIT_LOSS, TRADE_STATUS, CURRENT_PRICE, EXIT_TIME, MAX_PROFIT, MAX_LOSS, QUANTITY)
 										VALUES ($insert_id, '$stock_name', '$date_of_last_price{$stock_name}', '$time_of_last_price{$stock_name}', $stock_price, '$recommendation', $profit_price, $stop_loss_price, ($trade_commission*-1.0), ($trade_commission*-1.0), 'OPEN', $stock_price, '$time_of_last_price{$stock_name}', ($trade_commission*-1.0), ($trade_commission*-1.0), $quantity));
@@ -610,7 +637,7 @@ while ($repeat_always) {
 					}
 
 					my $email_recommendation = "CLOSED";
-					my $email_cmd = qq(-s "Fourways Profit: $report_simulation $time_of_last_price{$stock_name}: $email_recommendation $stock_name \($stock_price\) Profit: $profit_loss_u" $email_list < /dev/null);
+					my $email_cmd = qq(-s "Fourways Profit: $report_simulation $time_of_last_price{$stock_name}: $email_recommendation $stock_name \($stock_price\) Profit: $profit_loss_u Max_Drawdown: $max_loss Max_Profit: $max_profit" $email_list < /dev/null);
 					my $email_sent = $send_email == 1? system("$email_program $email_cmd") : 0;
 				}
 
