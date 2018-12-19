@@ -63,6 +63,19 @@ sub check_for_download_time {
 	return $download;
 }
 
+#Lets get the Nifty 50 stock Weights 
+#Nifty weight token fields
+my $NIFTY_W_SYMB = 0;
+my $NIFTY_W_WEIGHT = 1;
+my %nifty_weights;
+
+open (my $fh, '<', 'nifty_weight.csv') or die "Could not open file 'nifty_weight.csv' $!";
+while (my $line = <$fh>) {
+	chomp $line;
+	my @tokens = split/,/, $line;
+	$nifty_weights{$tokens[$NIFTY_W_SYMB]} = $tokens[$NIFTY_W_WEIGHT];
+}
+
 system("cp 01realtime_data.db tmp_abcdefgh.db");
 
 my $driver   = "SQLite";
@@ -141,9 +154,21 @@ while ($repeat_always) {
 						$tmp{'previousClose'} = $indexLtp - $indexCh;
 
 						$tmp{'per'} = $index_data[0]->{'per'};
-						$tmp{'trdVol'} = $data->{'trdVolumesum'};
 						$tmp{'wkhi'} = $index_data[0]->{'yHigh'};
 						$tmp{'wklo'} = $index_data[0]->{'yLow'};
+
+						#Calculate traded vol based on weighted volumes of 50 stocks
+						my @nifty_stocks = @{ $data->{'data'} };
+						my $nifty_volume = 0;
+						foreach my $item (@nifty_stocks) {
+							my $name = $item->{'symbol'};
+							my $volume = $item->{'trdVol'};
+							$volume =~ s/,//;
+							$volume = $volume * 100000; #Convert from Lacs
+							$nifty_volume += ($nifty_weights{$name}*$volume*0.01);
+						}
+						#Now store this volume as volume of Nifty
+						$tmp{'trdVol'} = sprintf("%.02f",$nifty_volume/100000);
 
 						push(@stock_data, \%tmp);
 					} else {
