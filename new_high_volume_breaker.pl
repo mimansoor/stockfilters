@@ -9,8 +9,8 @@ use Time::HiRes qw(gettimeofday);
 use strict;
 use warnings;
 
-my $simulation = 1;
-my $send_email = 0;
+my $simulation = 0;
+my $send_email = 1;
 my $email_list = "mimansoor\@gmail.com, lksingh74\@gmail.com, prathibha.chirag\@gmail.com";
 
 #View filed indexes
@@ -137,7 +137,7 @@ sub load_fno_market_lot {
 		my $symbol = $tokens[$FO_SYMBOL];
 
 		#skip line that has Symbol as symbol name
-                if ($symbol eq 'Symbol') {
+		if ($symbol eq 'Symbol') {
 			next;
 		}
 
@@ -183,20 +183,21 @@ my %time_of_last_price;
 my %date_of_last_price;
 my $lot_size_in_cash = 825000;
 my $trade_commission = 250;
-my $stop_loss_percentage = 0.70;
-my $profit_percentage = $stop_loss_percentage*1.5;
-my $cash_profit_target = 10000;
-my $cash_loss_target = -1000;
+my $stop_loss_percentage = 0.75;
+my $profit_percentage = $stop_loss_percentage*4.00;
+my $cash_profit_target = 40000;
+my $cash_loss_target = -40000;
 my $low_threshold = 0.1;
 my $high_threshold = 0.1;
 my $buy_change_threshold = -20.00;
 my $sell_change_threshold = 20.00;
 my $profit_dec_rate_per = 0.008;
-my $buy_per_threshold = 5.0;
-my $sell_per_threshold = -5.0;
+my $buy_per_threshold = 20.0;
+my $sell_per_threshold = -20.0;
 
 #After making 1 : 1 profit take atleast some money home
 my $take_home_threshold = $stop_loss_percentage;
+my $take_home_threshold_cash = 1500;
 
 #Load Market Lots from file
 load_fno_market_lot();
@@ -349,11 +350,8 @@ while ($repeat_always) {
 						$recommendation = "Short_Sell";
 					} else {
 						#printf("$last_row[$STOP_AT_PARTIAL] $sell_change_threshold :Going Long\n");
-						if ($stock_name eq "NIFTY_50") {
-							$recommendation = "Buy";
-						} else {
-							$recommendation = "Short_Sell";
-						}
+						#$recommendation = "Buy";
+						$recommendation = "Short_Sell";
 					}
 
 					$trade_trigerred = 1;
@@ -370,11 +368,8 @@ while ($repeat_always) {
 							$recommendation = "Buy";
 						} else {
 							#printf("$last_row[$STOCK_PERCNG] $buy_change_threshold :Going Short\n");
-							if ($stock_name eq "NIFTY_50") {
-								$recommendation = "Short_Sell";
-							} else {
-								$recommendation = "Buy";
-							}
+							#$recommendation = "Short_Sell";
+							$recommendation = "Buy";
 						}
 
 						$trade_trigerred = 1;
@@ -423,7 +418,7 @@ while ($repeat_always) {
 							#Close the old trade, and open new trade.
 							my $profit_loss = 0.0;
 							my $stop_profit = 0.0;
-							#my $quantity = floor($lot_size_in_cash/$open_trade_entry_price{$stock_name});
+
 							$quantity = $fno_market_lot{$stock_name};
 							if ($quantity eq '') {
 								$quantity = floor($lot_size_in_cash/$open_trade_entry_price{$stock_name});
@@ -560,11 +555,13 @@ while ($repeat_always) {
 				#Close position if we met minimum profit.
 				if ($profit_loss > $cash_profit_target) {
 					$trade_status = "CLOSED";
+					$profit_loss = $cash_profit_target;
 				}
 
 				#Close position if we met maximum loss.
 				if ($profit_loss < $cash_loss_target) {
 					$trade_status = "CLOSED";
+					$profit_loss = $cash_loss_target;
 				}
 
 				#Close positions if close time reached.
@@ -580,8 +577,21 @@ while ($repeat_always) {
 					if ($open_trade_type{$stock_name} eq "Buy") {
 						my $st = sprintf("%.4f",$closing_price*(1-$stop_loss_percentage/100.0));
 
-						#After making profit at least 1.5*$take_home_threshold then take atleast $take_home_threshold home
-						my $take_home_price = $open_trade_entry_price{$stock_name} * (1+($take_home_threshold*1.5)/100.0);
+						#check if profit_loss > threshold profit
+						my $cash_threshold_pr = $st;
+						if ($profit_loss > $take_home_threshold_cash) {
+							$cash_threshold_pr = $open_trade_entry_price{$stock_name} + ($take_home_threshold_cash / $quantity);
+							if ($st < $cash_threshold_pr) {
+								$st = $cash_threshold_pr;
+							}
+						}
+
+						if ($stop_loss < $st) {
+							$stop_loss = $st;
+						}
+
+						#After making profit at least X*$take_home_threshold then take atleast $take_home_threshold home
+						my $take_home_price = $open_trade_entry_price{$stock_name} * (1+($take_home_threshold*1.1)/100.0);
 						if ($closing_price > $take_home_price) {
 							$st = $open_trade_entry_price{$stock_name} * (1+$take_home_threshold/100.0);
 						}
@@ -597,8 +607,21 @@ while ($repeat_always) {
 					} else {
 						my $st = sprintf("%.4f",$closing_price*(1+$stop_loss_percentage/100.0));
 
-						#After making profit at least 1.5*$take_home_threshold then take atleast $take_home_threshold home
-						my $take_home_price = $open_trade_entry_price{$stock_name} * (1-($take_home_threshold*1.5)/100.0);
+						#check if profit_loss > threshold profit
+						my $cash_threshold_pr = $st;
+						if ($profit_loss > $take_home_threshold_cash) {
+							$cash_threshold_pr = $open_trade_entry_price{$stock_name} - ($take_home_threshold_cash / $quantity);
+							if ($st < $cash_threshold_pr) {
+								$st = $cash_threshold_pr;
+							}
+						}
+
+						if ($stop_loss < $st) {
+							$stop_loss = $st;
+						}
+
+						#After making profit at least X*$take_home_threshold then take atleast $take_home_threshold home
+						my $take_home_price = $open_trade_entry_price{$stock_name} * (1-($take_home_threshold*1.1)/100.0);
 						if ($closing_price < $take_home_price) {
 							$st = $open_trade_entry_price{$stock_name} * (1-$take_home_threshold/100.0);
 						}
@@ -647,6 +670,47 @@ while ($repeat_always) {
 							PROFIT_LOSS = $profit_loss_u, MAX_PROFIT = $max_profit, MAX_LOSS = $max_loss,
 							EXIT_TIME = '$time_of_last_price{$stock_name}' WHERE ID == $open_trade_id{$stock_name};);
 				my $my_ledger_rv = $dbh->do($update_stmt) or die $DBI::errstr;
+
+
+				#Open Reverse position if trade closed due to stop_loss hit
+				if ($profit_loss == $cash_profit_target) {
+					my $report_simulation = "";
+					my $recommendation;
+					my $stop_loss_price = 0.0;
+					my $profit_price = 0.0;
+
+					if ($simulation) {
+						$report_simulation = "[Simulation Ignore]";
+					}
+
+					if ($open_trade_type{$stock_name} eq "Buy") {
+						$recommendation = "Short_Sell";
+					} else {
+						$recommendation = "Buy";
+					}
+
+					if ($recommendation eq "Buy") {
+						$profit_price = sprintf("%.2f",$stock_price*(1+$profit_percentage/100.0));
+						$stop_loss_price = sprintf("%.2f",$stock_price*(1-$stop_loss_percentage/100.0));
+					} else {
+						$profit_price = sprintf("%.2f",$stock_price*(1-$profit_percentage/100.0));
+						$stop_loss_price = sprintf("%.2f",$stock_price*(1+$stop_loss_percentage/100.0));
+					}
+
+					#Now Open new position
+					my $email_recommendation = $recommendation;
+					my $email_cmd = qq(-s "Fourways Profit: $report_simulation $time_of_last_price{$stock_name}: $email_recommendation $stock_name \($stock_price\) Target: $profit_price StopLoss: $stop_loss_price" $email_list < /dev/null);
+					my $email_sent = $send_email == 1? system("$email_program $email_cmd") : 0;
+					#Now add the new record
+					my $insert_stmt = qq(INSERT INTO high_volume_calls_v2 (ID, NAME, DATE, ENTRY_TIME, ENTRY_PRICE, TRADE_TYPE, PROFIT_PRICE, STOP_LOSS_PRICE, STOP_PROFIT, PROFIT_LOSS, TRADE_STATUS, CURRENT_PRICE, EXIT_TIME, MAX_PROFIT, MAX_LOSS, QUANTITY)
+								VALUES ($insert_id, '$stock_name', '$date_of_last_price{$stock_name}', '$time_of_last_price{$stock_name}', $stock_price, '$recommendation', $profit_price, $stop_loss_price, ($trade_commission*-1.0), ($trade_commission*-1.0), 'OPEN', $stock_price, '$time_of_last_price{$stock_name}', ($trade_commission*-1.0), ($trade_commission*-1.0), $quantity));
+
+					my $rv = $dbh->do($insert_stmt) or warn print "$insert_stmt\n";
+
+					#make sure update last_price code doesn't see this
+					undef $open_trade_type{$stock_name};
+					$insert_id++;
+				}
 
 				$dbh->disconnect();
 			}
