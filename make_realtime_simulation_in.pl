@@ -15,14 +15,15 @@ my $password = "";
 
 #Open source database
 #my $database = "intraday_data.db";
-my $database = "01realtime_data.db";
+#my $database = "01realtime_data.db";
+my $database = "inrealtime_data.db";
 my $dsn = "DBI:$driver:dbname=$database";
 my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
                       or die $DBI::errstr;
 #print "Opened $database successfully\n";
 
 #Open simulation database
-my $realtime_db = "test_realtime.db";
+my $realtime_db = "intest_realtime.db";
 my $dsn1 = "DBI:$driver:dbname=$realtime_db";
 my $dbh1 = DBI->connect($dsn1, $userid, $password, { RaiseError => 1, AutoCommit => 1})
                       or die $DBI::errstr;
@@ -38,7 +39,7 @@ my $dbh1 = DBI->connect($dsn1, $userid, $password, { RaiseError => 1, AutoCommit
 
 #print "Collecting number of rows for each stock\n";
 #open (my $fh, '<', 'C.csv') or die "Could not open file 'C.csv' $!";
-open (my $fh, '<', 'D.csv') or die "Could not open file 'D.csv' $!";
+open (my $fh, '<', 'in.csv') or die "Could not open file 'in.csv' $!";
 my %count_rows;
 my %completed_rows;
 my $max_rows = -1;
@@ -83,7 +84,7 @@ while ($cur_row < $max_rows) {
 		}
 	}
 
-	system("cp test_realtime.db realtime_copy.db");
+	system("cp intest_realtime.db inrealtime_copy.db");
 	my $time_now = DateTime->now( time_zone => 'local' );
 	#print "$time_now: Completed $cur_row pass\n";
 	$cur_row++;

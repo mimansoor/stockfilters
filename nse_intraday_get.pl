@@ -1,6 +1,8 @@
 #/usr/bin/perl
 
 use lib qw( ..);
+use strict;
+use warnings;
 use JSON;
 use LWP::Simple;
 use DBI;
@@ -14,6 +16,10 @@ $url[1] = qq(https://nseindia.com/live_market/dynaContent/live_watch/stock_watch
 
 my $URL_SIZE = 2;
 my $toggle_url = 0;
+
+for (my $i = 0; $i < $URL_SIZE; $i++) {
+	$prev_time[$i] = "";
+}
 
 my %month;
 
@@ -75,6 +81,7 @@ while (my $line = <$fh>) {
 	my @tokens = split/,/, $line;
 	$nifty_weights{$tokens[$NIFTY_W_SYMB]} = $tokens[$NIFTY_W_WEIGHT];
 }
+close($fh);
 
 system("cp 01realtime_data.db tmp_abcdefgh.db");
 
@@ -84,7 +91,7 @@ my $dsn = "DBI:$driver:dbname=$database";
 my $userid = "";
 my $password = "";
 
-$repeat_always = 1;
+my $repeat_always = 1;
 
 my $same_time_received = 0;
 my $start_time;
@@ -96,7 +103,7 @@ while ($repeat_always) {
 
 	$same_time_received = 0;
 	if (check_for_download_time()) {
-		$id = time()*1000;
+		my $id = time()*1000;
 		my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
 				      or die $DBI::errstr;
 		my $tmp_url = $url[$toggle_url];
@@ -114,7 +121,8 @@ while ($repeat_always) {
 
 				#Dont store if the time is same from previous stored time.
 				$same_time_received = 1;
-				if ($prev_time[$toggle_url] ne $time) {
+
+				if (defined $time and $prev_time[$toggle_url] ne $time) {
 					my $date = $1;
 					$date =~ s/,//g;
 					$date =~ s/ /-/g;
@@ -122,7 +130,7 @@ while ($repeat_always) {
 
 					$prev_time[$toggle_url] = $time;
 					
-					if ($data->{'latestData'} ne "") {
+					if (defined $data->{'latestData'} and $data->{'latestData'} ne "") {
 						#Create item and push for index.
 						my @index_data = @{ $data->{'latestData'} };
 						my %tmp;
@@ -165,9 +173,20 @@ while ($repeat_always) {
 							my $volume = $item->{'trdVol'};
 							$volume =~ s/,//;
 							$volume = $volume * 100000; #Convert from Lacs
+							my $open = $item->{'open'};
+							$open =~ s/,//;
+							my $high = $item->{'high'};
+							$high =~ s/,//;
+							my $low  = $item->{'low'};
+							$low =~ s/,//;
+							my $last = $item->{'ltP'};
+							$last =~ s/,//;
+							my $avg_pr = ($open + $high + $low + $last) / 4.0;
 							$nifty_volume += ($nifty_weights{$name}*$volume*0.01);
 						}
+
 						#Now store this volume as volume of Nifty
+						$nifty_volume *= 4;
 						$tmp{'trdVol'} = sprintf("%.02f",$nifty_volume/100000);
 
 						push(@stock_data, \%tmp);
@@ -176,7 +195,6 @@ while ($repeat_always) {
 					}
 
 					foreach my $item (@stock_data) {
-						undef $stmt;
 						my $name = $item->{'symbol'};
 						$name =~ s/,//;
 						my $open = $item->{'open'};
@@ -190,7 +208,7 @@ while ($repeat_always) {
 						my $change = $item->{'ptsC'};
 						$change =~ s/,//;
 						my $prev_close = $item->{'previousClose'};
-						if ($prev_close ne "") {
+						if (defined $prev_close and $prev_close ne "") {
 							$prev_close =~ s/,//;
 						} else {
 							$prev_close = $last - $change;
@@ -210,14 +228,23 @@ while ($repeat_always) {
 						$low = $low eq "" ? 0 : $low;
 						$last = $last eq "" ? 0 : $last;
 
-						$corporate_action = $item->{'cAct'};
+						my $corporate_action = $item->{'cAct'};
 
 						my $dividend = 0;
 						my $ex_date = 19000101;
+						!defined $corporate_action and $corporate_action = "";
+
 						if ($corporate_action ne '-' and $corporate_action ne '') {
 							$corporate_action =~ /^(.*) ((.*) PER).*/;
-							if ($2 ne "" and $3 ne "") {
-								$dividend = sprintf("%.2f",$3);
+							my $div_rs = $3;
+							if (defined $div_rs) {
+								$div_rs =~ /(\d*\.?\d*).*/;
+								$div_rs = $1;
+							} else {
+								$div_rs = "";
+							}
+							if (defined $div_rs and $div_rs ne "") {
+								$dividend = sprintf("%.2f",$div_rs);
 							}
 
 							$ex_date = $item->{'xDt'};
