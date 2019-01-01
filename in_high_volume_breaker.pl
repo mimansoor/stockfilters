@@ -627,12 +627,12 @@ while ($repeat_always) {
 						my $cash_threshold_pr = $st;
 						if ($profit_loss > $take_home_threshold_cash) {
 							$cash_threshold_pr = $open_trade_entry_price{$stock_name} - ($take_home_threshold_cash / $quantity);
-							if ($st < $cash_threshold_pr) {
+							if ($st > $cash_threshold_pr) {
 								$st = $cash_threshold_pr;
 							}
 						}
 						
-						if ($stop_loss < $st) {
+						if ($stop_loss > $st) {
 							$stop_loss = $st;
 						}
 
