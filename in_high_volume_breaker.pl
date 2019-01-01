@@ -260,7 +260,7 @@ while ($repeat_always) {
 
 		#Just want to create a scope for local variables.
 		{
-			my $high_vol_db = "high_volume_calls.db";
+			my $high_vol_db = "in_high_volume_calls.db";
 			my $dsn = "DBI:$driver:dbname=$high_vol_db";
 			my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
 					      or die $DBI::errstr;
@@ -413,7 +413,7 @@ while ($repeat_always) {
 						}
 
 						#Now store it in a DB with Buy, take profit and stop loss values
-						my $database = "high_volume_calls.db";
+						my $database = "in_high_volume_calls.db";
 						my $dsn = "DBI:$driver:dbname=$database";
 						my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1, AutoCommit => 1 })
 								      or die $DBI::errstr;
@@ -507,7 +507,7 @@ while ($repeat_always) {
 			#Update last_price and check if we need to close the trade due to profit or stop loss trigger.
 			#Update only if last_row has valid data.
 			if (defined $last_row[$STOCK_ID] and defined $open_trade_type{$stock_name}) {
-				my $database = "high_volume_calls.db";
+				my $database = "in_high_volume_calls.db";
 				my $dsn = "DBI:$driver:dbname=$database";
 				my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1, AutoCommit => 1 })
 						      or die $DBI::errstr;
