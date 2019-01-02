@@ -63,6 +63,15 @@ my $HIGH_VOL_STOCK_QUANTITY		= 15;
 my $HIGH_VOL_STOCK_STOP_LOSS_POINTS	= 16;
 my $HIGH_VOL_STOCK_PROFIT_POINTS	= 17;
 
+#day of the week
+my $MON = 1;
+my $TUE = 2;
+my $WED = 3;
+my $THU = 4;
+my $FRI = 5;
+my $SAT = 6;
+my $SUN = 7;
+
 #FnO Market Lot table
 my %fno_market_lot;
 
@@ -76,7 +85,7 @@ sub check_for_download_time {
 
 	#Do not download on Saturday's and Sunday's
 	#Saturday == 6, Sunday == 7
-	if ($dow == 6 or $dow == 7) {
+	if ($dow == $SAT or $dow == $SUN) {
 		$download = 0;
 	} else {
 		#On Week Day's ie., Monday to Friday
@@ -364,8 +373,7 @@ while ($repeat_always) {
 			#	Sell: When you find a Non-zero high_change and %change > n% with high_volumes
 			#	Sell: When you find a Non-zero low_change and %change < n% with high_volumes
 			if ((defined $last_row[$STOCK_HIGH_VOL]) and (defined $lastb1_row[$STOCK_HIGH_VOL]) and
-				($lastb1_row[$STOCK_HIGH_VOL] == 1) and ($last_row[$STOCK_PERCNG] < $buy_per_threshold) and
-				($lastb1_row[$STOCK_LO_CNG] != 0 or $lastb1_row[$STOCK_HI_CNG] != 0) and
+				($lastb1_row[$STOCK_HIGH_VOL] == 1) and ($lastb1_row[$STOCK_LO_CNG] != 0 or $lastb1_row[$STOCK_HI_CNG] != 0) and
 				can_open_trade_time($last_row[$STOCK_TIME])) {
 				my $recommendation;
 
@@ -379,7 +387,7 @@ while ($repeat_always) {
 				#It is possible to see this since we sample twice.
 				if ((!defined $close_trade_exit_time{$stock_name} or
 				     ($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
-				    ($lastb1_row[$STOCK_HI_CNG] != 0) and
+				    ($lastb1_row[$STOCK_HI_CNG] != 0) and ($last_row[$STOCK_PERCNG] < $buy_per_threshold) and
 				    ($lastb1_row[$STOCK_LAST] > ($lastb1_row[$STOCK_HIGH]*(1-$high_threshold/100))) and
 				    ($stock_price < $lastb1_row[$STOCK_LAST])) {
 					if (($last_row[$STOCK_PERCNG] > $sell_change_threshold)) {

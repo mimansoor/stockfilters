@@ -42,6 +42,32 @@ my $LAST_TIME_VOLUME = 7;
 my $LAST_TIME_TIME = 8;
 my $LAST_TIME_DATE = 9;
 
+#View filed indexes
+my $HIGH_VOL_STOCK_ID 			= 0;
+my $HIGH_VOL_STOCK_NAME			= 1;
+my $HIGH_VOL_STOCK_DATE			= 2;
+my $HIGH_VOL_STOCK_ENTRY_TIME		= 3;
+my $HIGH_VOL_STOCK_ENTRY_PRICE		= 4;
+my $HIGH_VOL_STOCK_TRADE_TYPE 		= 5;
+my $HIGH_VOL_STOCK_PROFIT_PRICE		= 6;
+my $HIGH_VOL_STOCK_STOP_LOSS_PRICE 	= 7;
+my $HIGH_VOL_STOCK_STOP_PROFIT		= 8;
+my $HIGH_VOL_STOCK_PROFIT_LOSS		= 9;
+my $HIGH_VOL_STOCK_TRADE_STATUS		= 10;
+my $HIGH_VOL_STOCK_CURRENT_PRICE	= 11;
+my $HIGH_VOL_STOCK_EXIT_TIME		= 12;
+my $HIGH_VOL_STOCK_MAX_PROFIT		= 13;
+my $HIGH_VOL_STOCK_MAX_LOSS		= 14;
+my $HIGH_VOL_STOCK_QUANTITY		= 15;
+
+#day of the week
+my $MON = 1;
+my $TUE = 2;
+my $WED = 3;
+my $THU = 4;
+my $FRI = 5;
+my $SAT = 6;
+my $SUN = 7;
 
 #FnO Market Lot table
 my %fno_market_lot;
@@ -56,7 +82,7 @@ sub check_for_download_time {
 
 	#Do not download on Saturday's and Sunday's
 	#Saturday == 6, Sunday == 7
-	if ($dow == 6 or $dow == 7) {
+	if ($dow == $SAT or $dow == $SUN) {
 		$download = 0;
 	} else {
 		#On Week Day's ie., Monday to Friday
@@ -268,19 +294,19 @@ while ($repeat_always) {
 			my $sth = $dbh->prepare($stmt) or die $DBI::errstr;
 			$sth->execute();
 			while (my @data = $sth->fetchrow_array()) {
-				$open_trade_id{$data[1]} = $data[0];
-				$open_trade_entry_time{$data[1]} = $data[3];
-				$open_trade_entry_price{$data[1]} = $data[4];
-				$open_trade_type{$data[1]} = $data[5];
-				$open_trade_profit_price{$data[1]} = $data[6];
-				$open_trade_stop_loss_price{$data[1]} = $data[7];
-				$open_trade_max_profit{$data[1]} = $data[13];
-				$open_trade_max_loss{$data[1]} = $data[14];
+				$open_trade_id{$data[$HIGH_VOL_STOCK_NAME]} = $data[$HIGH_VOL_STOCK_ID];
+				$open_trade_entry_time{$data[$HIGH_VOL_STOCK_NAME]} = $data[$HIGH_VOL_STOCK_ENTRY_TIME];
+				$open_trade_entry_price{$data[$HIGH_VOL_STOCK_NAME]} = $data[$HIGH_VOL_STOCK_ENTRY_PRICE];
+				$open_trade_type{$data[$HIGH_VOL_STOCK_NAME]} = $data[$HIGH_VOL_STOCK_TRADE_TYPE];
+				$open_trade_profit_price{$data[$HIGH_VOL_STOCK_NAME]} = $data[$HIGH_VOL_STOCK_PROFIT_PRICE];
+				$open_trade_stop_loss_price{$data[$HIGH_VOL_STOCK_NAME]} = $data[$HIGH_VOL_STOCK_STOP_LOSS_PRICE];
+				$open_trade_max_profit{$data[$HIGH_VOL_STOCK_NAME]} = $data[$HIGH_VOL_STOCK_MAX_PROFIT];
+				$open_trade_max_loss{$data[$HIGH_VOL_STOCK_NAME]} = $data[$HIGH_VOL_STOCK_MAX_LOSS];
 
 				#Add the high,low and last, price into ledger
-				$open_trade_current_price{$data[1]} = $cur_price{$data[1]};
-				$open_trade_low{$data[1]} = $low_price{$data[1]};
-				$open_trade_high{$data[1]} = $high_price{$data[1]};
+				$open_trade_current_price{$data[$HIGH_VOL_STOCK_NAME]} = $cur_price{$data[$HIGH_VOL_STOCK_NAME]};
+				$open_trade_low{$data[$HIGH_VOL_STOCK_NAME]} = $low_price{$data[$HIGH_VOL_STOCK_NAME]};
+				$open_trade_high{$data[$HIGH_VOL_STOCK_NAME]} = $high_price{$data[$HIGH_VOL_STOCK_NAME]};
 			}
 			$sth->finish();
 			$dbh->disconnect();
@@ -301,7 +327,7 @@ while ($repeat_always) {
 
 			#Let it overwrite the exit_time so we get the last trade exit time only.
 			while (my @data = $sth->fetchrow_array()) {
-				$close_trade_exit_time{$data[1]} = $data[12];
+				$close_trade_exit_time{$data[$HIGH_VOL_STOCK_NAME]} = $data[$HIGH_VOL_STOCK_EXIT_TIME];
 			}
 			$sth->finish();
 			$dbh->disconnect();
@@ -322,6 +348,7 @@ while ($repeat_always) {
 			}
 
 			#Get the last row to see if trade triggered.
+			#This is from intraday database
 			my $dbh = DBI->connect($dsn, $userid, $password, { RaiseError => 1 })
 					      or die $DBI::errstr;
 
@@ -343,8 +370,7 @@ while ($repeat_always) {
 			#	Sell: When you find a Non-zero high_change and %change > n% with high_volumes
 			#	Sell: When you find a Non-zero low_change and %change < n% with high_volumes
 			if ((defined $last_row[$STOCK_HIGH_VOL]) and (defined $lastb1_row[$STOCK_HIGH_VOL]) and
-				($lastb1_row[$STOCK_HIGH_VOL] == 1) and ($last_row[$STOCK_PERCNG] < $buy_per_threshold) and
-				($lastb1_row[$STOCK_LO_CNG] != 0 or $lastb1_row[$STOCK_HI_CNG] != 0) and
+				($lastb1_row[$STOCK_HIGH_VOL] == 1) and ($lastb1_row[$STOCK_LO_CNG] != 0 or $lastb1_row[$STOCK_HI_CNG] != 0) and
 				can_open_trade_time($last_row[$STOCK_TIME])) {
 				my $recommendation;
 
@@ -356,7 +382,7 @@ while ($repeat_always) {
 				#It is possible to see this since we sample twice.
 				if ((!defined $close_trade_exit_time{$stock_name} or
 				     ($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
-				    ($lastb1_row[$STOCK_HI_CNG] != 0) and
+				    ($lastb1_row[$STOCK_HI_CNG] != 0) and ($last_row[$STOCK_PERCNG] < $buy_per_threshold) and
 				    ($lastb1_row[$STOCK_LAST] > ($lastb1_row[$STOCK_HIGH]*(1-$high_threshold/100))) and
 				    ($stock_price < $lastb1_row[$STOCK_LAST])) {
 					if (($last_row[$STOCK_PERCNG] > $sell_change_threshold)) {
