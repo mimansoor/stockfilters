@@ -11,7 +11,7 @@ use warnings;
 
 my $simulation = 0;
 my $send_email = 1;
-my $email_list = "mimansoor\@gmail.com, lksingh74\@gmail.com, prathibha.chirag\@gmail.com";
+my $email_list = "mimansoor\@gmail.com";
 
 #View filed indexes
 my $STOCK_ID 		= 0;
@@ -63,15 +63,6 @@ my $HIGH_VOL_STOCK_QUANTITY		= 15;
 my $HIGH_VOL_STOCK_STOP_LOSS_POINTS	= 16;
 my $HIGH_VOL_STOCK_PROFIT_POINTS	= 17;
 
-#day of the week
-my $MON = 1;
-my $TUE = 2;
-my $WED = 3;
-my $THU = 4;
-my $FRI = 5;
-my $SAT = 6;
-my $SUN = 7;
-
 #FnO Market Lot table
 my %fno_market_lot;
 
@@ -85,7 +76,7 @@ sub check_for_download_time {
 
 	#Do not download on Saturday's and Sunday's
 	#Saturday == 6, Sunday == 7
-	if ($dow == $SAT or $dow == $SUN) {
+	if ($dow == 6 or $dow == 7) {
 		$download = 0;
 	} else {
 		#On Week Day's ie., Monday to Friday
@@ -227,12 +218,12 @@ my $trade_commission = 250;
 my $stop_loss_percentage = 0.70;
 my $profit_percentage = $stop_loss_percentage*2.00;
 my $cash_profit_target = 40000;
-my $cash_loss_target = -40000;
+my $cash_loss_target = -500;
 my $low_threshold = 0.1;
 my $high_threshold = 0.1;
-my $buy_change_threshold = -20.00;
-my $sell_change_threshold = 20.00;
-my $profit_dec_rate_per = 0.008;
+my $buy_change_threshold = 650000;
+my $sell_change_threshold = -650000;
+my $profit_dec_rate_per = 0.006;
 my $buy_per_threshold = 20.0;
 my $sell_per_threshold = -20.0;
 
@@ -390,11 +381,10 @@ while ($repeat_always) {
 				    ($lastb1_row[$STOCK_HI_CNG] != 0) and ($last_row[$STOCK_PERCNG] < $buy_per_threshold) and
 				    ($lastb1_row[$STOCK_LAST] > ($lastb1_row[$STOCK_HIGH]*(1-$high_threshold/100))) and
 				    ($stock_price < $lastb1_row[$STOCK_LAST])) {
-					if (($last_row[$STOCK_PERCNG] > $sell_change_threshold)) {
+					if (($last_row[$STOCK_BAR_TURNOVER] > $buy_change_threshold)) {
 						$recommendation = "Short_Sell";
 					} else {
-						#$recommendation = "Buy";
-						$recommendation = "Short_Sell";
+						$recommendation = "Buy";
 					}
 
 					$trade_trigerred = 1;
@@ -406,11 +396,10 @@ while ($repeat_always) {
 					     ($lastb1_row[$STOCK_LO_CNG] != 0) and ($last_row[$STOCK_PERCNG] > $sell_per_threshold) and
 					     ($lastb1_row[$STOCK_LAST] < ($lastb1_row[$STOCK_LOW]*(1+$low_threshold/100))) and
 					     ($stock_price > $lastb1_row[$STOCK_LAST])) {
-						if (($last_row[$STOCK_PERCNG] < $buy_change_threshold)) {
+						if (($last_row[$STOCK_BAR_TURNOVER] < $sell_change_threshold)) {
 							$recommendation = "Buy";
 						} else {
-							#$recommendation = "Short_Sell";
-							$recommendation = "Buy";
+							$recommendation = "Short_Sell";
 						}
 
 						$trade_trigerred = 1;

@@ -186,7 +186,7 @@ while ($repeat_always) {
 						}
 
 						#Now store this volume as volume of Nifty
-						$nifty_volume *= 4;
+						$nifty_volume *= 2;
 						$tmp{'trdVol'} = sprintf("%.02f",$nifty_volume/100000);
 
 						push(@stock_data, \%tmp);

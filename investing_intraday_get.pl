@@ -212,7 +212,7 @@ to_sleep:
 
 	my $end_time = time();
 	$work_time = ($end_time - $start_time);
-	$delay_in_seconds = 120;
+	$delay_in_seconds = 180;
 
 	#To ensure alignment with actual clock if drift
 	#in seconds is > delay/2 (seconds)

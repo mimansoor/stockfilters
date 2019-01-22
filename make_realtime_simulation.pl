@@ -61,7 +61,7 @@ close $fh;
 #print "Done: Collecting number of rows for each stock\n";
 
 my $cur_row = 0;
-my $delay_in_seconds = 10;
+my $delay_in_seconds = 20;
 while ($cur_row < $max_rows) {
 	my $start_time = time();
 	foreach my $stock_name (sort keys %count_rows)

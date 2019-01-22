@@ -11,7 +11,7 @@ use warnings;
 
 my $simulation = 0;
 my $send_email = 1;
-my $email_list = "mimansoor\@gmail.com";
+my $email_list = "mimansoor\@gmail.com, lksingh74\@gmail.com, prathibha.chirag\@gmail.com";
 my $company_name = "Investing.com:";
 
 #View filed indexes
@@ -159,6 +159,7 @@ sub can_close_trade_time {
 }
 
 sub load_fno_market_lot {
+	return;
 	my $fno_market_lot_file = "fo_mktlots.csv";
 
 	unless(open (FILE, "< $fno_market_lot_file")) {
@@ -215,19 +216,19 @@ my %low_price;
 my %high_price;
 my %time_of_last_price;
 my %date_of_last_price;
-my $lot_size_in_cash = 800000;
-my $trade_commission = 250;
+my $lot_size_in_cash = 50000;
+my $trade_commission = 50;
 my $stop_loss_percentage = 0.75;
 my $profit_percentage = $stop_loss_percentage*4.00;
 my $cash_profit_target = 40000;
-my $cash_loss_target = -40000;
+my $cash_loss_target = -500;
 my $low_threshold = 0.1;
 my $high_threshold = 0.1;
 my $buy_change_threshold = -20.00;
 my $sell_change_threshold = 20.00;
 my $profit_dec_rate_per = 0.008;
-my $buy_per_threshold = 20.0;
-my $sell_per_threshold = -20.0;
+my $buy_per_threshold = 12.0;
+my $sell_per_threshold = -12.0;
 
 #After making 1 : 1 profit take atleast some money home
 my $take_home_threshold = $stop_loss_percentage;
@@ -370,7 +371,7 @@ while ($repeat_always) {
 			#	Sell: When you find a Non-zero high_change and %change > n% with high_volumes
 			#	Sell: When you find a Non-zero low_change and %change < n% with high_volumes
 			if ((defined $last_row[$STOCK_HIGH_VOL]) and (defined $lastb1_row[$STOCK_HIGH_VOL]) and
-				($lastb1_row[$STOCK_HIGH_VOL] == 1) and ($lastb1_row[$STOCK_LO_CNG] != 0 or $lastb1_row[$STOCK_HI_CNG] != 0) and
+				($lastb1_row[$STOCK_HIGH_VOL] == 1) and ($last_row[$STOCK_HIGH_VOL] == 0) and
 				can_open_trade_time($last_row[$STOCK_TIME])) {
 				my $recommendation;
 
@@ -381,37 +382,17 @@ while ($repeat_always) {
 				#Dont enter if we closed the position just in the last bar,
 				#It is possible to see this since we sample twice.
 				if ((!defined $close_trade_exit_time{$stock_name} or
-				     ($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
-				    ($lastb1_row[$STOCK_HI_CNG] != 0) and ($last_row[$STOCK_PERCNG] < $buy_per_threshold) and
-				    ($lastb1_row[$STOCK_LAST] > ($lastb1_row[$STOCK_HIGH]*(1-$high_threshold/100))) and
-				    ($stock_price < $lastb1_row[$STOCK_LAST])) {
-					if (($last_row[$STOCK_PERCNG] > $sell_change_threshold)) {
-						#printf("$last_row[$STOP_AT_PARTIAL] $sell_change_threshold :Short selling assuming pull back\n");
-						$recommendation = "Short_Sell";
-					} else {
-						#printf("$last_row[$STOP_AT_PARTIAL] $sell_change_threshold :Going Long\n");
-						#$recommendation = "Buy";
-						$recommendation = "Short_Sell";
-					}
-
+					($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
+					($lastb1_row[$STOCK_BAR_TURNOVER] > 0) and ($last_row[$STOCK_PERCNG] < $buy_per_threshold)) {
+					$recommendation = "Buy";
 					$trade_trigerred = 1;
 				} else {
 					#Dont enter if we closed the position just in the last bar,
 					#It is possible to see this since we sample twice.
 					if ((!defined $close_trade_exit_time{$stock_name} or
-					     ($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
-					     ($lastb1_row[$STOCK_LO_CNG] != 0) and ($last_row[$STOCK_PERCNG] > $sell_per_threshold) and
-					     ($lastb1_row[$STOCK_LAST] < ($lastb1_row[$STOCK_LOW]*(1+$low_threshold/100))) and
-					     ($stock_price > $lastb1_row[$STOCK_LAST])) {
-						if (($last_row[$STOCK_PERCNG] < $buy_change_threshold)) {
-							#printf("$last_row[$STOCK_PERCNG] $buy_change_threshold :Going Long assuming pull back\n");
-							$recommendation = "Buy";
-						} else {
-							#printf("$last_row[$STOCK_PERCNG] $buy_change_threshold :Going Short\n");
-							#$recommendation = "Short_Sell";
-							$recommendation = "Buy";
-						}
-
+						($close_trade_exit_time{$stock_name} ne $time_of_last_price{$stock_name})) and
+						($lastb1_row[$STOCK_BAR_TURNOVER] < 0) and ($last_row[$STOCK_PERCNG] > $sell_per_threshold)) {
+						$recommendation = "Short_Sell";
 						$trade_trigerred = 1;
 					}
 				}
@@ -570,9 +551,10 @@ while ($repeat_always) {
 						}
 					}
 
-					$closing_price = ($trade_status eq "CLOSED") ? (($open_trade_profit_price{$stock_name} <= $stock_price) ?
-							 $open_trade_profit_price{$stock_name} : ($open_trade_profit_price{$stock_name} <= $open_trade_high{$stock_name}) ?
-							 $open_trade_profit_price{$stock_name} : $open_trade_stop_loss_price{$stock_name}) : $stock_price;
+					#$closing_price = ($trade_status eq "CLOSED") ? (($open_trade_profit_price{$stock_name} <= $stock_price) ?
+					#$open_trade_profit_price{$stock_name} : ($open_trade_profit_price{$stock_name} <= $open_trade_high{$stock_name}) ?
+					#$open_trade_profit_price{$stock_name} : $open_trade_stop_loss_price{$stock_name}) : $stock_price;
+					$closing_price = $stock_price;
 
 					$profit_loss = sprintf("%.2f",(($closing_price - $open_trade_entry_price{$stock_name})*$quantity-$trade_commission));
 					$stop_profit = sprintf("%.2f",(($open_trade_stop_loss_price{$stock_name} - $open_trade_entry_price{$stock_name})*$quantity-$trade_commission));
@@ -586,9 +568,10 @@ while ($repeat_always) {
 						}
 					}
 
-					$closing_price = ($trade_status eq "CLOSED") ? (($open_trade_profit_price{$stock_name} >= $stock_price) ?
-							 $open_trade_profit_price{$stock_name} : ($open_trade_profit_price{$stock_name} >= $open_trade_low{$stock_name}) ?
-							 $open_trade_profit_price{$stock_name} : $open_trade_stop_loss_price{$stock_name}) : $stock_price;
+					#$closing_price = ($trade_status eq "CLOSED") ? (($open_trade_profit_price{$stock_name} >= $stock_price) ?
+					#		 $open_trade_profit_price{$stock_name} : ($open_trade_profit_price{$stock_name} >= $open_trade_low{$stock_name}) ?
+					#		 $open_trade_profit_price{$stock_name} : $open_trade_stop_loss_price{$stock_name}) : $stock_price;
+					$closing_price = $stock_price;
 
 					$profit_loss = sprintf("%.2f",(($open_trade_entry_price{$stock_name} - $closing_price)*$quantity-$trade_commission));
 					$stop_profit = sprintf("%.2f",(($open_trade_entry_price{$stock_name} - $open_trade_stop_loss_price{$stock_name})*$quantity-$trade_commission));
@@ -597,13 +580,13 @@ while ($repeat_always) {
 				#Close position if we met minimum profit.
 				if ($profit_loss > $cash_profit_target) {
 					$trade_status = "CLOSED";
-					$profit_loss = $cash_profit_target;
+					#$profit_loss = $cash_profit_target;
 				}
 
 				#Close position if we met maximum loss.
 				if ($profit_loss < $cash_loss_target) {
 					$trade_status = "CLOSED";
-					$profit_loss = $cash_loss_target;
+					#$profit_loss = $cash_loss_target;
 				}
 
 				#Close positions if close time reached.
